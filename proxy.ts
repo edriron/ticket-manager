@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes that don't need auth
-  const publicRoutes = ['/login', '/auth/callback']
+  const publicRoutes = ['/login', '/auth/callback', '/api/keep-alive']
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
   // Not logged in → redirect to login
