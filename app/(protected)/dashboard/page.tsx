@@ -184,7 +184,7 @@ export default async function DashboardPage() {
                     <Link
                       key={ticket.id}
                       href={`/tickets/${ticket.id}`}
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                     >
                       <UserAvatar
                         displayName={requester?.display_name}
@@ -192,7 +192,7 @@ export default async function DashboardPage() {
                         size="sm"
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-mono text-muted-foreground">
                             #{ticket.ticket_number}
                           </span>
@@ -200,8 +200,11 @@ export default async function DashboardPage() {
                         </div>
                         <p className="text-sm truncate">{ticket.title}</p>
                       </div>
-                      <div className="shrink-0">
+                      <div className="flex flex-col items-end gap-1 shrink-0">
                         <PriorityBadge priority={(ticket as unknown as TicketType).priority} showIcon={false} />
+                        <span className="text-xs text-muted-foreground">
+                          {formatRelativeTime(ticket.created_at)}
+                        </span>
                       </div>
                     </Link>
                   )
