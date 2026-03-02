@@ -26,6 +26,7 @@ interface CommentSectionProps {
   comments: TicketComment[]
   activityLogs: ActivityLog[]
   currentUser: Profile
+  discordThreadId?: string | null
 }
 
 function ActivityItem({ log }: { log: ActivityLog }) {
@@ -147,6 +148,7 @@ export function CommentSection({
   comments: initialComments,
   activityLogs,
   currentUser,
+  discordThreadId,
 }: CommentSectionProps) {
   const [comments, setComments] = useState<TicketComment[]>(initialComments)
   const [submitting, setSubmitting] = useState(false)
@@ -180,6 +182,20 @@ export function CommentSection({
     setComments((prev) => [...prev, data as TicketComment])
     form.reset()
     setSubmitting(false)
+
+    // Mirror comment to Discord thread
+    if (discordThreadId) {
+      fetch('/api/notify-discord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'comment',
+          threadId: discordThreadId,
+          content: values.content,
+          authorName: currentUser.display_name ?? 'Someone',
+        }),
+      }).catch(() => {})
+    }
   }
 
   async function handleDelete(id: string) {

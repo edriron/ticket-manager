@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Pencil, ExternalLink, Paperclip } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, ExternalLink, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -14,6 +14,17 @@ import { CommentSection } from '@/components/tickets/comment-section'
 import { TicketForm } from '@/components/tickets/ticket-form'
 import { formatDateTime, formatRelativeTime } from '@/lib/utils'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +74,7 @@ export function TicketDetailClient({
     ticket.assignee as Profile | null
   )
   const [savingField, setSavingField] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [assigneeOpen, setAssigneeOpen] = useState(false)
   const [userResults, setUserResults] = useState<Profile[]>([])
 
@@ -97,11 +109,29 @@ export function TicketDetailClient({
     return true
   }
 
+  function notifyDiscordUpdate(newStatus: TicketStatus, newPriority: TicketPriority, newAssigneeName: string | null | undefined) {
+    if (ticket.type !== 'bug' || !ticket.discord_thread_id) return
+    fetch('/api/notify-discord', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'update',
+        threadId: ticket.discord_thread_id,
+        title: ticket.title,
+        priority: newPriority,
+        status: newStatus,
+        assignee: newAssigneeName ?? null,
+        updatedBy: currentUser.display_name,
+      }),
+    }).catch(() => {})
+  }
+
   async function handleStatusChange(newStatus: TicketStatus) {
     const ok = await updateField('status', newStatus, TICKET_STATUS_LABELS[newStatus])
     if (ok) {
       setStatus(newStatus)
       toast.success(`Status → ${TICKET_STATUS_LABELS[newStatus]}`)
+      notifyDiscordUpdate(newStatus, priority, assigneeProfile?.display_name)
     }
   }
 
@@ -110,6 +140,7 @@ export function TicketDetailClient({
     if (ok) {
       setPriority(newPriority)
       toast.success(`Priority → ${TICKET_PRIORITY_LABELS[newPriority]}`)
+      notifyDiscordUpdate(status, newPriority, assigneeProfile?.display_name)
     }
   }
 
@@ -125,9 +156,11 @@ export function TicketDetailClient({
           .single()
         setAssigneeProfile(data as Profile | null)
         toast.success('Assignee updated')
+        notifyDiscordUpdate(status, priority, (data as Profile | null)?.display_name)
       } else {
         setAssigneeProfile(null)
         toast.success('Assignee removed')
+        notifyDiscordUpdate(status, priority, null)
       }
     }
   }
@@ -137,6 +170,34 @@ export function TicketDetailClient({
     if (query) q.or(`display_name.ilike.%${query}%,email.ilike.%${query}%`)
     const { data } = await q
     setUserResults((data as Profile[]) ?? [])
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+
+    // Post deletion notice to Discord thread and archive it
+    if (ticket.discord_thread_id) {
+      fetch('/api/notify-discord', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          threadId: ticket.discord_thread_id,
+        }),
+      }).catch(() => {})
+    }
+
+    const { error } = await supabase.from('tickets').delete().eq('id', ticket.id)
+
+    if (error) {
+      toast.error('Failed to delete ticket', { description: error.message })
+      setDeleting(false)
+      return
+    }
+
+    toast.success('Ticket deleted')
+    router.push('/tickets')
+    router.refresh()
   }
 
   const priorities: TicketPriority[] = ['critical', 'high', 'medium', 'low']
@@ -183,15 +244,43 @@ export function TicketDetailClient({
           </p>
         </div>
         {!editing && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 shrink-0"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="h-4 w-4" />
-            Edit
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="gap-1.5" disabled={deleting}>
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete ticket #{ticket.ticket_number}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete the ticket, all its comments, attachments, and
+                    activity history. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete ticket
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         )}
       </div>
 
@@ -208,6 +297,7 @@ export function TicketDetailClient({
                   mode="edit"
                   ticket={{ ...ticket, status, priority, assignee_id: assigneeId }}
                   currentUserId={currentUser.id}
+                  currentUserName={currentUser.display_name ?? undefined}
                   onCancel={() => setEditing(false)}
                 />
               </CardContent>
@@ -335,6 +425,7 @@ export function TicketDetailClient({
                   comments={comments}
                   activityLogs={activityLogs}
                   currentUser={currentUser}
+                  discordThreadId={ticket.discord_thread_id}
                 />
               </CardContent>
             </Card>

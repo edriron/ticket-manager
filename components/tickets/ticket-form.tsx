@@ -35,6 +35,7 @@ interface TicketFormProps {
   mode: "create" | "edit";
   ticket?: Ticket;
   currentUserId: string;
+  currentUserName?: string;
   onCancel?: () => void;
 }
 
@@ -42,6 +43,7 @@ export function TicketForm({
   mode,
   ticket,
   currentUserId,
+  currentUserName,
   onCancel,
 }: TicketFormProps) {
   const router = useRouter();
@@ -96,7 +98,7 @@ export function TicketForm({
       const { data: newTicket, error } = await supabase
         .from("tickets")
         .insert({ ...payload, requester_id: currentUserId })
-        .select("id")
+        .select("id, ticket_number")
         .single();
 
       if (error) {
@@ -124,6 +126,40 @@ export function TicketForm({
         user_id: currentUserId,
         action: "created",
       });
+
+      // Notify Discord bugs channel, then save the returned thread ID
+      if (values.type === "bug") {
+        try {
+          const res = await fetch("/api/notify-discord", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "create",
+              ticketId: newTicket.id,
+              ticketNumber: (newTicket as { id: string; ticket_number: number }).ticket_number,
+              title: values.title,
+              priority: values.priority,
+              description: values.description || null,
+              stepsToReproduce: values.steps_to_reproduce || null,
+              expectedBehavior: values.expected_behavior || null,
+              actualBehavior: values.actual_behavior || null,
+              environmentUrl: values.environment_url || null,
+              attachments: attachments.map((a) => ({ filename: a.filename, url: a.url })),
+            }),
+          });
+          if (res.ok) {
+            const { threadId, messageId } = await res.json();
+            if (threadId) {
+              await supabase
+                .from("tickets")
+                .update({ discord_thread_id: threadId, discord_message_id: messageId ?? null })
+                .eq("id", newTicket.id);
+            }
+          }
+        } catch {
+          // Discord failure must not block the UI
+        }
+      }
 
       toast.success("Ticket created successfully!");
       router.push(`/tickets/${newTicket.id}`);
@@ -160,6 +196,22 @@ export function TicketForm({
         user_id: currentUserId,
         action: "updated",
       });
+
+      // Notify Discord thread of the update
+      if (ticket.discord_thread_id && ticket.type === "bug") {
+        fetch("/api/notify-discord", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "update",
+            threadId: ticket.discord_thread_id,
+            title: values.title,
+            priority: values.priority,
+            status: values.status,
+            updatedBy: currentUserName,
+          }),
+        }).catch(() => {});
+      }
 
       toast.success("Ticket updated!");
       router.refresh();

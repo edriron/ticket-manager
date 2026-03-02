@@ -25,6 +25,8 @@ export interface Ticket {
   steps_to_reproduce: string | null
   expected_behavior: string | null
   actual_behavior: string | null
+  discord_thread_id: string | null
+  discord_message_id: string | null
   created_at: string
   updated_at: string
   // Joined fields
