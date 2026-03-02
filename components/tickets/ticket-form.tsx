@@ -127,38 +127,37 @@ export function TicketForm({
         action: "created",
       });
 
-      // Notify Discord bugs channel, then save the returned thread ID
-      if (values.type === "bug") {
-        try {
-          const res = await fetch("/api/notify-discord", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "create",
-              ticketId: newTicket.id,
-              ticketNumber: (newTicket as { id: string; ticket_number: number }).ticket_number,
-              title: values.title,
-              priority: values.priority,
-              description: values.description || null,
-              stepsToReproduce: values.steps_to_reproduce || null,
-              expectedBehavior: values.expected_behavior || null,
-              actualBehavior: values.actual_behavior || null,
-              environmentUrl: values.environment_url || null,
-              attachments: attachments.map((a) => ({ filename: a.filename, url: a.url })),
-            }),
-          });
-          if (res.ok) {
-            const { threadId, messageId } = await res.json();
-            if (threadId) {
-              await supabase
-                .from("tickets")
-                .update({ discord_thread_id: threadId, discord_message_id: messageId ?? null })
-                .eq("id", newTicket.id);
-            }
+      // Notify the appropriate Discord channel, then save the returned thread ID
+      try {
+        const res = await fetch("/api/notify-discord", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create",
+            ticketType: values.type,
+            ticketId: newTicket.id,
+            ticketNumber: (newTicket as { id: string; ticket_number: number }).ticket_number,
+            title: values.title,
+            priority: values.priority,
+            description: values.description || null,
+            stepsToReproduce: values.steps_to_reproduce || null,
+            expectedBehavior: values.expected_behavior || null,
+            actualBehavior: values.actual_behavior || null,
+            environmentUrl: values.environment_url || null,
+            attachments: attachments.map((a) => ({ filename: a.filename, url: a.url })),
+          }),
+        });
+        if (res.ok) {
+          const { threadId, messageId } = await res.json();
+          if (threadId) {
+            await supabase
+              .from("tickets")
+              .update({ discord_thread_id: threadId, discord_message_id: messageId ?? null })
+              .eq("id", newTicket.id);
           }
-        } catch {
-          // Discord failure must not block the UI
         }
+      } catch {
+        // Discord failure must not block the UI
       }
 
       toast.success("Ticket created successfully!");
@@ -198,12 +197,13 @@ export function TicketForm({
       });
 
       // Notify Discord thread of the update
-      if (ticket.discord_thread_id && ticket.type === "bug") {
+      if (ticket.discord_thread_id) {
         fetch("/api/notify-discord", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "update",
+            ticketType: ticket.type,
             threadId: ticket.discord_thread_id,
             title: values.title,
             priority: values.priority,

@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// ── Webhook resolution ────────────────────────────────────────────────────────
+function resolveWebhook(ticketType: string): string | null {
+  if (ticketType === 'feature_request') {
+    return process.env.DISCORD_FEATURE_WEBHOOK_URL ?? null
+  }
+  return process.env.DISCORD_WEBHOOK_URL ?? null
+}
+
+// ── Styling per ticket type ───────────────────────────────────────────────────
+const TYPE_META: Record<string, { emoji: string; label: string; color: number }> = {
+  bug:             { emoji: '🐛', label: 'Bug',             color: 0xED4245 },
+  feature_request: { emoji: '✨', label: 'Feature Request', color: 0x9B59B6 },
+}
+
 const PRIORITY_COLORS: Record<string, number> = {
   critical: 0xED4245,
   high:     0xFF6B35,
@@ -27,15 +41,17 @@ function truncate(text: string, max: number) {
 }
 
 export async function POST(request: NextRequest) {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL
+  const body = await request.json()
+  const { action, ticketType = 'bug' } = body
+
+  const webhookUrl = resolveWebhook(ticketType)
   if (!webhookUrl) {
     return NextResponse.json({ error: 'Discord webhook not configured' }, { status: 500 })
   }
 
-  const body = await request.json()
-  const { action } = body
+  const meta = TYPE_META[ticketType] ?? TYPE_META.bug
 
-  // ── CREATE: new forum post with full bug details ──────────────────────────
+  // ── CREATE: new forum post ────────────────────────────────────────────────
   if (action === 'create') {
     const {
       ticketId, ticketNumber, title, priority,
@@ -56,18 +72,17 @@ export async function POST(request: NextRequest) {
       fields.push({ name: 'Steps to Reproduce', value: truncate(stepsToReproduce, 500) })
     }
     if (expectedBehavior || actualBehavior) {
-      if (expectedBehavior) fields.push({ name: '✅ Expected',  value: truncate(expectedBehavior, 300), inline: true })
-      if (actualBehavior)   fields.push({ name: '❌ Actual',    value: truncate(actualBehavior,   300), inline: true })
+      if (expectedBehavior) fields.push({ name: '✅ Expected', value: truncate(expectedBehavior, 300), inline: true })
+      if (actualBehavior)   fields.push({ name: '❌ Actual',   value: truncate(actualBehavior,   300), inline: true })
     }
     if (environmentUrl) {
       fields.push({ name: 'Environment', value: environmentUrl })
     }
 
-    // First embed: all content + first image (if any)
     const mainEmbed: Record<string, unknown> = {
-      title: `🐛 Bug #${ticketNumber}: ${title}`,
+      title: `${meta.emoji} ${meta.label} #${ticketNumber}: ${title}`,
       url: ticketUrl,
-      color: PRIORITY_COLORS[priority] ?? 0x99AAB5,
+      color: PRIORITY_COLORS[priority] ?? meta.color,
       fields,
       footer: { text: 'TrackIt' },
       timestamp: new Date().toISOString(),
@@ -79,13 +94,11 @@ export async function POST(request: NextRequest) {
       mainEmbed.image = { url: attachments[0].url }
     }
 
-    // Additional embeds share the same `url` → Discord renders them as a gallery
     const extraEmbeds = attachments.slice(1, 4).map((a: { url: string }) => ({
       url: ticketUrl,
       image: { url: a.url },
     }))
 
-    // ?wait=true makes Discord return the created message object instead of 204
     const res = await fetch(`${webhookUrl}?wait=true`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -100,7 +113,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Discord request failed', detail: text }, { status: 502 })
     }
 
-    // id = starter message ID, channel_id = the new forum thread's ID
     const msg = await res.json()
     return NextResponse.json({ ok: true, threadId: msg.channel_id ?? null, messageId: msg.id ?? null })
   }
@@ -138,7 +150,7 @@ export async function POST(request: NextRequest) {
       { name: 'Priority', value: PRIORITY_LABELS[priority] ?? priority, inline: true },
       { name: 'Status',   value: STATUS_LABELS[status] ?? status,       inline: true },
     ]
-    if (title)    fields.push({ name: 'Title',    value: title })
+    if (title)     fields.push({ name: 'Title',      value: title })
     fields.push({ name: 'Assignee', value: assignee ?? 'Unassigned' })
     if (updatedBy) fields.push({ name: 'Updated by', value: updatedBy })
 
@@ -168,7 +180,6 @@ export async function POST(request: NextRequest) {
     const { threadId } = body
     if (!threadId) return NextResponse.json({ ok: true })
 
-    // Post a visible deletion notice inside the thread
     await fetch(`${webhookUrl}?thread_id=${threadId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -182,7 +193,6 @@ export async function POST(request: NextRequest) {
       }),
     }).catch(() => {})
 
-    // Archive + lock the thread if a bot token is configured
     const botToken = process.env.DISCORD_BOT_TOKEN
     if (botToken) {
       await fetch(`https://discord.com/api/v10/channels/${threadId}`, {

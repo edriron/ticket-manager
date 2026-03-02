@@ -110,12 +110,13 @@ export function TicketDetailClient({
   }
 
   function notifyDiscordUpdate(newStatus: TicketStatus, newPriority: TicketPriority, newAssigneeName: string | null | undefined) {
-    if (ticket.type !== 'bug' || !ticket.discord_thread_id) return
+    if (!ticket.discord_thread_id) return
     fetch('/api/notify-discord', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'update',
+        ticketType: ticket.type,
         threadId: ticket.discord_thread_id,
         title: ticket.title,
         priority: newPriority,
@@ -182,6 +183,7 @@ export function TicketDetailClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'delete',
+          ticketType: ticket.type,
           threadId: ticket.discord_thread_id,
         }),
       }).catch(() => {})
@@ -426,6 +428,7 @@ export function TicketDetailClient({
                   activityLogs={activityLogs}
                   currentUser={currentUser}
                   discordThreadId={ticket.discord_thread_id}
+                  ticketType={ticket.type}
                 />
               </CardContent>
             </Card>

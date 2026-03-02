@@ -27,6 +27,7 @@ interface CommentSectionProps {
   activityLogs: ActivityLog[]
   currentUser: Profile
   discordThreadId?: string | null
+  ticketType?: string
 }
 
 function ActivityItem({ log }: { log: ActivityLog }) {
@@ -149,6 +150,7 @@ export function CommentSection({
   activityLogs,
   currentUser,
   discordThreadId,
+  ticketType,
 }: CommentSectionProps) {
   const [comments, setComments] = useState<TicketComment[]>(initialComments)
   const [submitting, setSubmitting] = useState(false)
@@ -190,6 +192,7 @@ export function CommentSection({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'comment',
+          ticketType,
           threadId: discordThreadId,
           content: values.content,
           authorName: currentUser.display_name ?? 'Someone',
