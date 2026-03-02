@@ -1,11 +1,20 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Menu, Bug, LayoutDashboard, Ticket, Settings, LogOut } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/layout/theme-toggle'
-import { UserAvatar } from '@/components/layout/user-avatar'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Menu,
+  LayoutDashboard,
+  Ticket,
+  Settings,
+  LogOut,
+  Bug,
+} from "lucide-react";
+import Image from "next/image";
+import logo from "@/app/logo.png";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { UserAvatar } from "@/components/layout/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,38 +22,38 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet'
-import { cn } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import type { Profile } from '@/types'
+} from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import type { Profile } from "@/types";
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/tickets', label: 'Tickets', icon: Ticket },
-  { href: '/settings', label: 'Settings', icon: Settings },
-]
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/tickets", label: "Tickets", icon: Ticket },
+  { href: "/settings", label: "Settings", icon: Settings },
+];
 
 interface NavbarProps {
-  profile: Profile | null
+  profile: Profile | null;
 }
 
 export function Navbar({ profile }: NavbarProps) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
+  const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
 
   async function handleSignOut() {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
   }
 
   return (
@@ -59,18 +68,30 @@ export function Navbar({ profile }: NavbarProps) {
         </SheetTrigger>
         <SheetContent side="left" className="w-56 p-0">
           <SheetHeader className="flex flex-row items-center gap-2 h-14 px-4 border-b">
-            <Bug className="h-5 w-5 text-primary" />
-            <SheetTitle className="font-semibold tracking-tight">TrackIt</SheetTitle>
+            <Image
+              src={logo}
+              alt="TrackIt"
+              width={20}
+              height={20}
+              className="h-5 w-5 object-contain"
+            />
+            <SheetTitle className="font-semibold tracking-tight">
+              TrackIt
+            </SheetTitle>
           </SheetHeader>
           <nav className="flex flex-col gap-1 p-3">
             {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Button
                   key={item.href}
-                  variant={isActive ? 'secondary' : 'ghost'}
-                  className={cn('justify-start gap-2 h-9', isActive && 'font-medium')}
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "justify-start gap-2 h-9",
+                    isActive && "font-medium",
+                  )}
                   asChild
                 >
                   <Link href={item.href}>
@@ -78,7 +99,7 @@ export function Navbar({ profile }: NavbarProps) {
                     {item.label}
                   </Link>
                 </Button>
-              )
+              );
             })}
           </nav>
         </SheetContent>
@@ -109,7 +130,7 @@ export function Navbar({ profile }: NavbarProps) {
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">
-                {profile?.display_name ?? 'User'}
+                {profile?.display_name ?? "User"}
               </p>
               <p className="text-xs leading-none text-muted-foreground">
                 {profile?.email}
@@ -134,5 +155,5 @@ export function Navbar({ profile }: NavbarProps) {
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
-  )
+  );
 }

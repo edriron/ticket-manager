@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Ticket, Settings, Bug } from 'lucide-react'
+import { LayoutDashboard, Ticket, Settings } from 'lucide-react'
+import Image from 'next/image'
+import logo from '@/app/logo.png'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -30,7 +32,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-56 border-r bg-background min-h-screen shrink-0">
       <div className="flex items-center gap-2 h-14 px-4 border-b">
-        <Bug className="h-5 w-5 text-primary" />
+        <Image src={logo} alt="TrackIt" width={20} height={20} className="h-5 w-5 object-contain" />
         <span className="font-semibold text-base tracking-tight">TrackIt</span>
       </div>
 

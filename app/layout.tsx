@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import logoImage from './logo.png'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Toaster } from 'sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -21,6 +22,9 @@ export const metadata: Metadata = {
     template: '%s | TrackIt',
   },
   description: 'Raise and track bugs and feature requests with your team.',
+  icons: {
+    icon: logoImage.src,
+  },
 }
 
 export default function RootLayout({
