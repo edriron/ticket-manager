@@ -89,23 +89,21 @@ export function TicketDetailClient({
       .update({ [field]: value })
       .eq('id', ticket.id)
 
+    setSavingField(null)
+
     if (error) {
-      toast.error(`Failed to update ${field}`)
-      setSavingField(null)
       return false
     }
 
-    // Log activity
-    await supabase.from('activity_logs').insert({
+    // Fire-and-forget: activity log doesn't need to block the UI
+    supabase.from('activity_logs').insert({
       ticket_id: ticket.id,
       user_id: currentUser.id,
       action: 'updated',
       field,
       new_value: displayValue ?? value,
-    })
+    }).then()
 
-    setSavingField(null)
-    router.refresh()
     return true
   }
 
@@ -128,41 +126,49 @@ export function TicketDetailClient({
   }
 
   async function handleStatusChange(newStatus: TicketStatus) {
+    const prev = status
+    setStatus(newStatus) // optimistic
     const ok = await updateField('status', newStatus, TICKET_STATUS_LABELS[newStatus])
     if (ok) {
-      setStatus(newStatus)
       toast.success(`Status → ${TICKET_STATUS_LABELS[newStatus]}`)
       notifyDiscordUpdate(newStatus, priority, assigneeProfile?.display_name)
+    } else {
+      setStatus(prev) // rollback
+      toast.error('Failed to update status')
     }
   }
 
   async function handlePriorityChange(newPriority: TicketPriority) {
+    const prev = priority
+    setPriority(newPriority) // optimistic
     const ok = await updateField('priority', newPriority, TICKET_PRIORITY_LABELS[newPriority])
     if (ok) {
-      setPriority(newPriority)
       toast.success(`Priority → ${TICKET_PRIORITY_LABELS[newPriority]}`)
       notifyDiscordUpdate(status, newPriority, assigneeProfile?.display_name)
+    } else {
+      setPriority(prev) // rollback
+      toast.error('Failed to update priority')
     }
   }
 
   async function handleAssigneeChange(newAssigneeId: string | null) {
+    const prevId = assigneeId
+    const prevProfile = assigneeProfile
+    // Optimistic: use profile already available in search results
+    const optimisticProfile = newAssigneeId
+      ? (userResults.find((u) => u.id === newAssigneeId) ?? null)
+      : null
+    setAssigneeId(newAssigneeId)
+    setAssigneeProfile(optimisticProfile)
+
     const ok = await updateField('assignee_id', newAssigneeId)
     if (ok) {
-      setAssigneeId(newAssigneeId)
-      if (newAssigneeId) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', newAssigneeId)
-          .single()
-        setAssigneeProfile(data as Profile | null)
-        toast.success('Assignee updated')
-        notifyDiscordUpdate(status, priority, (data as Profile | null)?.display_name)
-      } else {
-        setAssigneeProfile(null)
-        toast.success('Assignee removed')
-        notifyDiscordUpdate(status, priority, null)
-      }
+      toast.success(newAssigneeId ? 'Assignee updated' : 'Assignee removed')
+      notifyDiscordUpdate(status, priority, optimisticProfile?.display_name ?? null)
+    } else {
+      setAssigneeId(prevId) // rollback
+      setAssigneeProfile(prevProfile)
+      toast.error('Failed to update assignee')
     }
   }
 
