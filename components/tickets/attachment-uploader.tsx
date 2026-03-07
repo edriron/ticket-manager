@@ -1,29 +1,29 @@
-'use client'
+"use client";
 
-import { useState, useRef } from 'react'
-import { Upload, X, FileImage, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import Image from 'next/image'
+import { useState, useRef, useEffect } from "react";
+import { Upload, X, FileImage, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 export interface UploadedFile {
-  id?: string
-  filename: string
-  url: string
-  size: number
-  mime_type: string
-  isNew?: boolean
-  path?: string
+  id?: string;
+  filename: string;
+  url: string;
+  size: number;
+  mime_type: string;
+  isNew?: boolean;
+  path?: string;
 }
 
 interface AttachmentUploaderProps {
-  ticketId?: string
-  value: UploadedFile[]
-  onChange: (files: UploadedFile[]) => void
-  disabled?: boolean
-  maxFiles?: number
+  ticketId?: string;
+  value: UploadedFile[];
+  onChange: (files: UploadedFile[]) => void;
+  disabled?: boolean;
+  maxFiles?: number;
 }
 
 export function AttachmentUploader({
@@ -33,28 +33,61 @@ export function AttachmentUploader({
   disabled,
   maxFiles = 5,
 }: AttachmentUploaderProps) {
-  const [uploading, setUploading] = useState(false)
-  const [dragging, setDragging] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const supabase = createClient()
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const supabase = createClient();
+  const dropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (disabled || uploading) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const files: File[] = [];
+
+      for (const item of items) {
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file && file.type.startsWith("image/")) {
+            files.push(file);
+          }
+        }
+      }
+
+      if (files.length > 0) {
+        handleFiles(files);
+      }
+    };
+
+    document.addEventListener("paste", handlePaste);
+
+    return () => {
+      document.removeEventListener("paste", handlePaste);
+    };
+  }, [disabled, uploading, value]);
 
   async function uploadFile(file: File): Promise<UploadedFile | null> {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const folder = ticketId ?? 'temp'
-    const path = `${folder}/${id}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const folder = ticketId ?? "temp";
+    const path = `${folder}/${id}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
 
     const { error } = await supabase.storage
-      .from('ticket-attachments')
-      .upload(path, file, { contentType: file.type })
+      .from("ticket-attachments")
+      .upload(path, file, { contentType: file.type });
 
     if (error) {
-      toast.error(`Failed to upload ${file.name}`, { description: error.message })
-      return null
+      toast.error(`Failed to upload ${file.name}`, {
+        description: error.message,
+      });
+      return null;
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('ticket-attachments')
-      .getPublicUrl(path)
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("ticket-attachments").getPublicUrl(path);
 
     return {
       filename: file.name,
@@ -63,46 +96,48 @@ export function AttachmentUploader({
       mime_type: file.type,
       isNew: true,
       path,
-    }
+    };
   }
 
-  async function handleFiles(files: FileList) {
+  async function handleFiles(files: File[] | FileList) {
     if (value.length >= maxFiles) {
-      toast.error(`Maximum ${maxFiles} files allowed`)
-      return
+      toast.error(`Maximum ${maxFiles} files allowed`);
+      return;
     }
 
-    const toUpload = Array.from(files)
-      .filter((f) => f.type.startsWith('image/'))
-      .slice(0, maxFiles - value.length)
+    const fileArray = Array.from(files);
+
+    const toUpload = fileArray
+      .filter((f) => f.type.startsWith("image/"))
+      .slice(0, maxFiles - value.length);
 
     if (toUpload.length === 0) {
-      toast.error('Only image files are allowed')
-      return
+      toast.error("Only image files are allowed");
+      return;
     }
 
-    setUploading(true)
-    const uploaded: UploadedFile[] = []
+    setUploading(true);
+    const uploaded: UploadedFile[] = [];
 
     for (const file of toUpload) {
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large (max 10MB)`)
-        continue
+        toast.error(`${file.name} is too large (max 10MB)`);
+        continue;
       }
-      const result = await uploadFile(file)
-      if (result) uploaded.push(result)
+      const result = await uploadFile(file);
+      if (result) uploaded.push(result);
     }
 
-    onChange([...value, ...uploaded])
-    setUploading(false)
+    onChange([...value, ...uploaded]);
+    setUploading(false);
   }
 
   async function removeFile(index: number) {
-    const file = value[index]
+    const file = value[index];
     if (file.path) {
-      await supabase.storage.from('ticket-attachments').remove([file.path])
+      await supabase.storage.from("ticket-attachments").remove([file.path]);
     }
-    onChange(value.filter((_, i) => i !== index))
+    onChange(value.filter((_, i) => i !== index));
   }
 
   return (
@@ -110,19 +145,28 @@ export function AttachmentUploader({
       {/* Drop zone */}
       <div
         className={cn(
-          'border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer',
+          "border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer",
           dragging
-            ? 'border-primary bg-primary/5'
-            : 'border-border hover:border-primary/50 hover:bg-muted/30',
-          (disabled || uploading || value.length >= maxFiles) && 'opacity-50 cursor-not-allowed'
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-primary/50 hover:bg-muted/30",
+          (disabled || uploading || value.length >= maxFiles) &&
+            "opacity-50 cursor-not-allowed",
         )}
-        onClick={() => !disabled && !uploading && value.length < maxFiles && inputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onClick={() =>
+          !disabled &&
+          !uploading &&
+          value.length < maxFiles &&
+          inputRef.current?.click()
+        }
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
-          e.preventDefault()
-          setDragging(false)
-          if (!disabled && !uploading) handleFiles(e.dataTransfer.files)
+          e.preventDefault();
+          setDragging(false);
+          if (!disabled && !uploading) handleFiles(e.dataTransfer.files);
         }}
       >
         <input
@@ -144,7 +188,10 @@ export function AttachmentUploader({
             <Upload className="h-6 w-6" />
             <div>
               <p className="text-sm font-medium">Drop screenshots here</p>
-              <p className="text-xs">or click to browse — images only, max 10MB each</p>
+              <p className="text-xs">
+                or click to browse / ctrl + v to paste — images only, max 10MB
+                each
+              </p>
             </div>
             <p className="text-xs">
               {value.length}/{maxFiles} files
@@ -161,7 +208,7 @@ export function AttachmentUploader({
               key={index}
               className="relative group rounded-lg border overflow-hidden bg-muted"
             >
-              {file.mime_type?.startsWith('image/') ? (
+              {file.mime_type?.startsWith("image/") ? (
                 <div className="aspect-video relative">
                   <Image
                     src={file.url}
@@ -177,7 +224,9 @@ export function AttachmentUploader({
                 </div>
               )}
               <div className="p-2">
-                <p className="text-xs truncate text-muted-foreground">{file.filename}</p>
+                <p className="text-xs truncate text-muted-foreground">
+                  {file.filename}
+                </p>
               </div>
               {!disabled && (
                 <Button
@@ -195,5 +244,5 @@ export function AttachmentUploader({
         </div>
       )}
     </div>
-  )
+  );
 }
