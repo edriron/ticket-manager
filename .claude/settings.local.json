@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"c:\\\\Projects\\\\bug-feature-tickets\\\\app\\\\\\(protected\\)\"\")",
+      "Bash(ls '/c/Projects/bug-feature-tickets/app/\\(protected\\)/')"
+    ]
+  }
+}

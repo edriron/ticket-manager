@@ -23,6 +23,7 @@ interface SearchParams {
   status?: string
   priority?: string
   assignee?: string
+  doneFilter?: string
 }
 
 export default async function TicketsPage({
@@ -58,6 +59,16 @@ export default async function TicketsPage({
   if (params.assignee === 'me') {
     query = query.eq('assignee_id', user!.id)
   }
+
+  // Done filter: default hides done tickets not updated within the last 24 hours
+  const doneFilter = params.doneFilter ?? 'recent_done'
+  if (doneFilter === 'hide_done') {
+    query = query.neq('status', 'done')
+  } else if (doneFilter === 'recent_done') {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    query = query.or(`status.neq.done,updated_at.gte.${cutoff}`)
+  }
+  // doneFilter === 'all' → no additional filter
 
   const { data: tickets } = await query
 

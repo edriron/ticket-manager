@@ -22,6 +22,9 @@ export function TicketFilters() {
   const type = searchParams.get('type') ?? 'all'
   const status = searchParams.get('status') ?? 'all'
   const priority = searchParams.get('priority') ?? 'all'
+  const assignee = searchParams.get('assignee') ?? 'all'
+  // 'recent_done' is the default: hide done tickets not updated in last 24h
+  const doneFilter = searchParams.get('doneFilter') ?? 'recent_done'
 
   const createQueryString = useCallback(
     (params: Record<string, string | null>) => {
@@ -38,15 +41,22 @@ export function TicketFilters() {
     [searchParams]
   )
 
-  const hasFilters = search || type !== 'all' || status !== 'all' || priority !== 'all'
+  const hasFilters =
+    !!search ||
+    type !== 'all' ||
+    status !== 'all' ||
+    priority !== 'all' ||
+    assignee === 'me' ||
+    doneFilter === 'all' ||
+    doneFilter === 'hide_done'
 
   function clearFilters() {
     router.push(pathname)
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-2">
-      <div className="relative flex-1">
+    <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
+      <div className="relative flex-1 min-w-40">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search tickets..."
@@ -59,6 +69,23 @@ export function TicketFilters() {
         />
       </div>
 
+      {/* Assigned to me */}
+      <Select
+        value={assignee}
+        onValueChange={(value) => {
+          const qs = createQueryString({ assignee: value === 'all' ? null : value })
+          router.push(`${pathname}?${qs}`)
+        }}
+      >
+        <SelectTrigger className="w-full sm:w-40">
+          <SelectValue placeholder="Assigned to" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All assignees</SelectItem>
+          <SelectItem value="me">Assigned to me</SelectItem>
+        </SelectContent>
+      </Select>
+
       <Select
         value={type}
         onValueChange={(value) => {
@@ -66,11 +93,11 @@ export function TicketFilters() {
           router.push(`${pathname}?${qs}`)
         }}
       >
-        <SelectTrigger className="w-full sm:w-[160px]">
+        <SelectTrigger className="w-full sm:w-40">
           <SelectValue placeholder="Type" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Types</SelectItem>
+          <SelectItem value="all">All types</SelectItem>
           <SelectItem value="bug">Bug</SelectItem>
           <SelectItem value="feature_request">Feature Request</SelectItem>
         </SelectContent>
@@ -83,11 +110,11 @@ export function TicketFilters() {
           router.push(`${pathname}?${qs}`)
         }}
       >
-        <SelectTrigger className="w-full sm:w-[160px]">
+        <SelectTrigger className="w-full sm:w-40">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
+          <SelectItem value="all">All statuses</SelectItem>
           <SelectItem value="todo">To Do</SelectItem>
           <SelectItem value="in_progress">In Progress</SelectItem>
           <SelectItem value="pending">Pending</SelectItem>
@@ -103,15 +130,33 @@ export function TicketFilters() {
           router.push(`${pathname}?${qs}`)
         }}
       >
-        <SelectTrigger className="w-full sm:w-[150px]">
+        <SelectTrigger className="w-full sm:w-37.5">
           <SelectValue placeholder="Priority" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Priorities</SelectItem>
+          <SelectItem value="all">All priorities</SelectItem>
           <SelectItem value="critical">Critical</SelectItem>
           <SelectItem value="high">High</SelectItem>
           <SelectItem value="medium">Medium</SelectItem>
           <SelectItem value="low">Low</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Done filter — default hides done tickets older than 24h */}
+      <Select
+        value={doneFilter}
+        onValueChange={(value) => {
+          const qs = createQueryString({ doneFilter: value === 'recent_done' ? null : value })
+          router.push(`${pathname}?${qs}`)
+        }}
+      >
+        <SelectTrigger className="w-full sm:w-45">
+          <SelectValue placeholder="Done filter" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="recent_done">Active + recent done</SelectItem>
+          <SelectItem value="hide_done">Hide all done</SelectItem>
+          <SelectItem value="all">Show all</SelectItem>
         </SelectContent>
       </Select>
 

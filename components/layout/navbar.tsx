@@ -10,6 +10,7 @@ import {
   LogOut,
   Bug,
 } from "lucide-react";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import Image from "next/image";
 import logo from "@/app/logo.png";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,8 @@ export function Navbar({ profile }: NavbarProps) {
       <div className="flex-1" />
 
       <ThemeToggle />
+
+      <NotificationBell userId={profile?.id ?? ''} />
 
       {/* User menu */}
       <DropdownMenu>

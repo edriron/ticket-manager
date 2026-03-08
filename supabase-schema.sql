@@ -217,6 +217,58 @@ CREATE POLICY "Uploaders can delete their attachments"
 
 
 -- ============================================================
+-- 9. NOTIFICATIONS TABLE
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id         UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  ticket_id  UUID REFERENCES tickets(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  body       TEXT,
+  read       BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS notifications_user_read_idx ON notifications(user_id, read);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own notifications"
+  ON notifications FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Authenticated users can insert notifications"
+  ON notifications FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Users can update own notifications"
+  ON notifications FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id);
+
+
+-- ============================================================
+-- 10. ALLOW ANY AUTHENTICATED USER TO UPDATE TICKETS
+-- Run this to replace the existing restrictive UPDATE policy:
+-- ============================================================
+
+-- Drop the old policy first:
+DROP POLICY IF EXISTS "Requester or assignee can update tickets" ON tickets;
+
+-- New policy — any authenticated user can update any ticket:
+CREATE POLICY "Authenticated users can update tickets"
+  ON tickets FOR UPDATE TO authenticated
+  USING (true);
+
+-- Also allow any authenticated user to delete tickets
+-- (previously only requester/assignee could delete — if you had a delete policy):
+-- DROP POLICY IF EXISTS "Requester or assignee can delete tickets" ON tickets;
+-- CREATE POLICY "Authenticated users can delete tickets"
+--   ON tickets FOR DELETE TO authenticated
+--   USING (true);
+
+
+-- ============================================================
 -- DONE! Next steps:
 -- 1. In Supabase → Authentication → Providers → enable Google
 -- 2. Add your Google OAuth credentials (Client ID + Secret)

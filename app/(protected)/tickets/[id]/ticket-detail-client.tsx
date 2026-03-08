@@ -82,6 +82,16 @@ export function TicketDetailClient({
   const supabase = createClient()
   const router = useRouter()
 
+  function notifyUsers(title: string, body: string, excludeForAssigneeId?: string | null) {
+    // Notify requester + assignee, excluding the current user and optionally one more id
+    const targetIds = [ticket.requester_id, excludeForAssigneeId ?? assigneeId]
+      .filter((id): id is string => !!id && id !== currentUser.id)
+    if (!targetIds.length) return
+    supabase.from('notifications').insert(
+      targetIds.map((user_id) => ({ user_id, title, body, ticket_id: ticket.id }))
+    ).then()
+  }
+
   async function updateField(field: string, value: string | null, displayValue?: string) {
     setSavingField(field)
     const { error } = await supabase
@@ -132,6 +142,10 @@ export function TicketDetailClient({
     if (ok) {
       toast.success(`Status → ${TICKET_STATUS_LABELS[newStatus]}`)
       notifyDiscordUpdate(newStatus, priority, assigneeProfile?.display_name)
+      notifyUsers(
+        `Ticket #${ticket.ticket_number} status changed`,
+        `"${ticket.title}" → ${TICKET_STATUS_LABELS[newStatus]}`,
+      )
     } else {
       setStatus(prev) // rollback
       toast.error('Failed to update status')
@@ -145,6 +159,10 @@ export function TicketDetailClient({
     if (ok) {
       toast.success(`Priority → ${TICKET_PRIORITY_LABELS[newPriority]}`)
       notifyDiscordUpdate(status, newPriority, assigneeProfile?.display_name)
+      notifyUsers(
+        `Ticket #${ticket.ticket_number} priority changed`,
+        `"${ticket.title}" → ${TICKET_PRIORITY_LABELS[newPriority]}`,
+      )
     } else {
       setPriority(prev) // rollback
       toast.error('Failed to update priority')
@@ -165,6 +183,21 @@ export function TicketDetailClient({
     if (ok) {
       toast.success(newAssigneeId ? 'Assignee updated' : 'Assignee removed')
       notifyDiscordUpdate(status, priority, optimisticProfile?.display_name ?? null)
+      // Notify the new assignee (if not current user)
+      if (newAssigneeId && newAssigneeId !== currentUser.id) {
+        supabase.from('notifications').insert({
+          user_id: newAssigneeId,
+          title: `You were assigned to ticket #${ticket.ticket_number}`,
+          body: ticket.title,
+          ticket_id: ticket.id,
+        }).then()
+      }
+      // Notify requester about the assignee change (excluding new assignee to avoid double)
+      notifyUsers(
+        `Ticket #${ticket.ticket_number} assignee changed`,
+        `"${ticket.title}" assigned to ${optimisticProfile?.display_name ?? 'nobody'}`,
+        newAssigneeId,
+      )
     } else {
       setAssigneeId(prevId) // rollback
       setAssigneeProfile(prevProfile)
