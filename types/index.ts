@@ -1,6 +1,7 @@
 export type TicketType = 'bug' | 'feature_request'
 export type TicketStatus = 'todo' | 'in_progress' | 'pending' | 'in_testing' | 'done'
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical'
+export type TicketProduct = 'vetra' | 'gym_pocket' | 'trackit' | 'aqua' | 'other'
 
 export interface Profile {
   id: string
@@ -27,6 +28,7 @@ export interface Ticket {
   actual_behavior: string | null
   discord_thread_id: string | null
   discord_message_id: string | null
+  product: TicketProduct
   created_at: string
   updated_at: string
   // Joined fields
@@ -51,6 +53,7 @@ export interface TicketComment {
   ticket_id: string
   user_id: string
   content: string
+  attachments?: { url: string; filename: string }[]
   created_at: string
   updated_at: string
   user?: Profile
@@ -85,7 +88,7 @@ export const TICKET_PRIORITY_LABELS: Record<TicketPriority, string> = {
 
 export const TICKET_TYPE_LABELS: Record<TicketType, string> = {
   bug: 'Bug',
-  feature_request: 'Feature Request',
+  feature_request: 'Feature',
 }
 
 export const TICKET_STATUS_ORDER: TicketStatus[] = [
@@ -95,3 +98,18 @@ export const TICKET_STATUS_ORDER: TicketStatus[] = [
   'in_testing',
   'done',
 ]
+
+export const TICKET_PRODUCT_LABELS: Record<TicketProduct, string> = {
+  vetra: 'Vetra',
+  gym_pocket: 'Gym Pocket',
+  trackit: 'TrackIt',
+  aqua: 'Aqua',
+  other: 'Other',
+}
+
+export const TICKET_PRODUCT_ICON_PATHS: Partial<Record<TicketProduct, string>> = {
+  vetra: '/products/vetra.svg',
+  gym_pocket: '/products/gym-pocket.svg',
+  trackit: '/products/trackit.svg',
+  aqua: '/products/aqua.svg',
+}

@@ -18,7 +18,7 @@ export function UserAvatar({ displayName, avatarUrl, className, size = 'md' }: U
 
   return (
     <Avatar className={cn(sizeClass, className)}>
-      {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName ?? 'User'} />}
+      {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName ?? 'User'} referrerPolicy="no-referrer" />}
       <AvatarFallback className="font-medium">
         {getInitials(displayName)}
       </AvatarFallback>

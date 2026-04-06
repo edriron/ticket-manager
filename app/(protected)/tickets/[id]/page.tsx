@@ -53,11 +53,10 @@ export default async function TicketDetailPage({ params }: Props) {
     .eq('ticket_id', id)
     .order('created_at', { ascending: true })
 
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: currentProfile }, { data: profiles }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('profiles').select('id, display_name, email, avatar_url, created_at, updated_at').order('display_name'),
+  ])
 
   return (
     <TicketDetailClient
@@ -65,6 +64,7 @@ export default async function TicketDetailPage({ params }: Props) {
       comments={(comments as TicketComment[]) ?? []}
       activityLogs={(activityLogs as ActivityLog[]) ?? []}
       currentUser={currentProfile as Profile}
+      profiles={(profiles as Profile[]) ?? []}
     />
   )
 }

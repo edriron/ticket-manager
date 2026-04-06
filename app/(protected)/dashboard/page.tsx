@@ -7,13 +7,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Ticket, Bug, Sparkles, CheckCircle2, ClockIcon, Plus } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { formatRelativeTime } from '@/lib/utils'
 import { UserAvatar } from '@/components/layout/user-avatar'
 import type { Metadata } from 'next'
-import type { Ticket as TicketType } from '@/types'
+import type { Ticket as TicketType, TicketProduct } from '@/types'
+import { TICKET_PRODUCT_ICON_PATHS, TICKET_PRODUCT_LABELS } from '@/types'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
+}
+
+function ProductIcon({ product }: { product: TicketProduct }) {
+  const path = TICKET_PRODUCT_ICON_PATHS[product]
+  if (!path) return null
+  return (
+    <Image
+      src={path}
+      alt={TICKET_PRODUCT_LABELS[product]}
+      width={16}
+      height={16}
+      className="rounded-sm shrink-0"
+      title={TICKET_PRODUCT_LABELS[product]}
+    />
+  )
 }
 
 export default async function DashboardPage() {
@@ -41,7 +58,7 @@ export default async function DashboardPage() {
   const { data: myTickets } = await supabase
     .from('tickets')
     .select(`
-      id, ticket_number, title, type, status, priority, created_at,
+      id, ticket_number, title, type, status, priority, product, created_at,
       requester:profiles!tickets_requester_id_fkey(id, display_name, avatar_url)
     `)
     .eq('assignee_id', user!.id)
@@ -53,7 +70,7 @@ export default async function DashboardPage() {
   const { data: recentTickets } = await supabase
     .from('tickets')
     .select(`
-      id, ticket_number, title, type, status, priority, created_at,
+      id, ticket_number, title, type, status, priority, product, created_at,
       requester:profiles!tickets_requester_id_fkey(id, display_name, avatar_url),
       assignee:profiles!tickets_assignee_id_fkey(id, display_name, avatar_url)
     `)
@@ -68,7 +85,7 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground text-sm">Overview of all tickets</p>
         </div>
         <Button asChild size="sm" className="gap-1.5">
-          <Link href="/tickets/new">
+          <Link href="/tickets">
             <Plus className="h-4 w-4" />
             New Ticket
           </Link>
@@ -144,6 +161,7 @@ export default async function DashboardPage() {
                         <span className="text-xs font-mono text-muted-foreground">
                           #{ticket.ticket_number}
                         </span>
+                        <ProductIcon product={(ticket as unknown as TicketType).product} />
                         <TypeBadge type={(ticket as unknown as TicketType).type} showIcon={false} />
                       </div>
                       <p className="text-sm font-medium truncate">{ticket.title}</p>
@@ -196,6 +214,7 @@ export default async function DashboardPage() {
                           <span className="text-xs font-mono text-muted-foreground">
                             #{ticket.ticket_number}
                           </span>
+                          <ProductIcon product={(ticket as unknown as TicketType).product} />
                           <TypeBadge type={(ticket as unknown as TicketType).type} showIcon={false} />
                         </div>
                         <p className="text-sm truncate">{ticket.title}</p>
@@ -218,7 +237,7 @@ export default async function DashboardPage() {
                 <Ticket className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No tickets yet</p>
                 <Button variant="outline" size="sm" asChild className="mt-3">
-                  <Link href="/tickets/new">Create first ticket</Link>
+                  <Link href="/tickets">Create first ticket</Link>
                 </Button>
               </div>
             )}

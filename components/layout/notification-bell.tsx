@@ -41,6 +41,13 @@ export function NotificationBell({ userId }: { userId: string }) {
     if (data) setNotifications(data as Notification[])
   }, [userId, supabase])
 
+  const markAllRead = useCallback(async (list: Notification[]) => {
+    const ids = list.filter((n) => !n.read).map((n) => n.id)
+    if (!ids.length) return
+    await supabase.from('notifications').update({ read: true }).in('id', ids)
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  }, [supabase])
+
   useEffect(() => {
     fetchNotifications()
     const channel = supabase
@@ -48,17 +55,26 @@ export function NotificationBell({ userId }: { userId: string }) {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        () => fetchNotifications()
+        () => fetchNotifications(),
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [userId, fetchNotifications, supabase])
 
-  async function markAllRead() {
-    const ids = notifications.filter((n) => !n.read).map((n) => n.id)
-    if (!ids.length) return
-    await supabase.from('notifications').update({ read: true }).in('id', ids)
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  // Auto-mark all read when the popover opens
+  async function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (nextOpen) {
+      const { data } = await supabase
+        .from('notifications')
+        .select('id, title, body, ticket_id, read, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(PREVIEW_COUNT)
+      const fresh = (data ?? []) as Notification[]
+      setNotifications(fresh)
+      await markAllRead(fresh)
+    }
   }
 
   async function markRead(id: string) {
@@ -68,7 +84,7 @@ export function NotificationBell({ userId }: { userId: string }) {
   }
 
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) fetchNotifications() }}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-8 w-8">
           <Bell className="h-4 w-4" />
@@ -82,22 +98,7 @@ export function NotificationBell({ userId }: { userId: string }) {
       <PopoverContent align="end" className="w-80 p-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm">Notifications</span>
-            {unreadCount > 0 && (
-              <span className="rounded-full bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 leading-none font-medium">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllRead}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Mark all read
-            </button>
-          )}
+          <span className="font-semibold text-sm">Notifications</span>
         </div>
 
         {/* List */}
@@ -109,19 +110,8 @@ export function NotificationBell({ userId }: { userId: string }) {
           ) : (
             notifications.map((n) => {
               const inner = (
-                <div
-                  className={cn(
-                    'px-4 py-3 hover:bg-muted/40 transition-colors',
-                    !n.read && 'bg-primary/5',
-                  )}
-                >
+                <div className="px-4 py-3 hover:bg-muted/40 transition-colors">
                   <div className="flex items-start gap-2.5">
-                    <span
-                      className={cn(
-                        'mt-1.5 h-1.5 w-1.5 rounded-full shrink-0',
-                        n.read ? 'bg-transparent' : 'bg-primary',
-                      )}
-                    />
                     <div className="min-w-0">
                       <p className="text-sm font-medium leading-snug">{n.title}</p>
                       {n.body && (

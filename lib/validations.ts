@@ -13,6 +13,7 @@ export const ticketSchema = z.object({
   type: z.enum(['bug', 'feature_request'] as const),
   status: z.enum(['todo', 'in_progress', 'pending', 'in_testing', 'done'] as const),
   priority: z.enum(['low', 'medium', 'high', 'critical'] as const),
+  product: z.enum(['vetra', 'gym_pocket', 'trackit', 'aqua', 'other'] as const),
   description: z.string().max(10000, 'Description is too long').optional().or(z.literal('')),
   environment_url: z
     .string()

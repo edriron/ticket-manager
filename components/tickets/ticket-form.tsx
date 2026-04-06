@@ -5,12 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { ticketSchema, type TicketFormValues } from "@/lib/validations";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -30,6 +30,9 @@ import { Separator } from "@/components/ui/separator";
 import { UserSearch } from "./user-search";
 import { AttachmentUploader, type UploadedFile } from "./attachment-uploader";
 import type { Ticket, TicketAttachment } from "@/types";
+import { TICKET_PRODUCT_LABELS, TICKET_PRODUCT_ICON_PATHS } from "@/types";
+
+const PRODUCTS = ["vetra", "gym_pocket", "trackit", "aqua", "other"] as const;
 
 interface TicketFormProps {
   mode: "create" | "edit";
@@ -37,6 +40,8 @@ interface TicketFormProps {
   currentUserId: string;
   currentUserName?: string;
   onCancel?: () => void;
+  /** Called after successful submit. If omitted in create mode, navigates to the new ticket page. */
+  onSuccess?: (ticketId: string) => void;
 }
 
 export function TicketForm({
@@ -45,6 +50,7 @@ export function TicketForm({
   currentUserId,
   currentUserName,
   onCancel,
+  onSuccess,
 }: TicketFormProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -66,6 +72,7 @@ export function TicketForm({
       type: ticket?.type ?? undefined,
       status: ticket?.status ?? "todo",
       priority: ticket?.priority ?? "medium",
+      product: ticket?.product ?? "other",
       description: ticket?.description ?? "",
       environment_url: ticket?.environment_url ?? "",
       assignee_id: ticket?.assignee_id ?? "",
@@ -86,6 +93,7 @@ export function TicketForm({
       type: values.type,
       status: values.status,
       priority: values.priority,
+      product: values.product,
       description: values.description || null,
       environment_url: values.environment_url || null,
       assignee_id: values.assignee_id || null,
@@ -127,7 +135,7 @@ export function TicketForm({
         action: "created",
       });
 
-      // Notify the appropriate Discord channel, then save the returned thread ID
+      // Notify Discord
       try {
         const res = await fetch("/api/notify-discord", {
           method: "POST",
@@ -160,9 +168,13 @@ export function TicketForm({
         // Discord failure must not block the UI
       }
 
-      toast.success("Ticket created successfully!");
-      router.push(`/tickets/${newTicket.id}`);
-      router.refresh();
+      toast.success("Ticket created!");
+      if (onSuccess) {
+        onSuccess(newTicket.id);
+      } else {
+        router.push(`/tickets/${newTicket.id}`);
+        router.refresh();
+      }
     } else if (mode === "edit" && ticket) {
       const { error } = await supabase
         .from("tickets")
@@ -175,7 +187,7 @@ export function TicketForm({
         return;
       }
 
-      // Handle new attachments (those without an id)
+      // Handle new attachments
       const newAttachments = attachments.filter((a) => !a.id);
       if (newAttachments.length > 0) {
         const attachmentRows = newAttachments.map((a) => ({
@@ -196,7 +208,7 @@ export function TicketForm({
         action: "updated",
       });
 
-      // Notify Discord thread of the update
+      // Notify Discord thread
       if (ticket.discord_thread_id) {
         fetch("/api/notify-discord", {
           method: "POST",
@@ -214,8 +226,12 @@ export function TicketForm({
       }
 
       toast.success("Ticket updated!");
-      router.refresh();
-      onCancel?.();
+      if (onSuccess) {
+        onSuccess(ticket.id);
+      } else {
+        router.refresh();
+        onCancel?.();
+      }
     }
 
     setLoading(false);
@@ -244,8 +260,8 @@ export function TicketForm({
           )}
         />
 
-        {/* Type + Priority row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Type + Priority + Product row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="type"
@@ -262,9 +278,7 @@ export function TicketForm({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="bug">🐛 Bug</SelectItem>
-                    <SelectItem value="feature_request">
-                      ✨ Feature Request
-                    </SelectItem>
+                    <SelectItem value="feature_request">✨ Feature Request</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -289,6 +303,39 @@ export function TicketForm({
                     <SelectItem value="high">🔴 High</SelectItem>
                     <SelectItem value="medium">🟡 Medium</SelectItem>
                     <SelectItem value="low">🟢 Low</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="product"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Product</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {PRODUCTS.map((p) => {
+                      const iconPath = TICKET_PRODUCT_ICON_PATHS[p];
+                      return (
+                        <SelectItem key={p} value={p}>
+                          <div className="flex items-center gap-2">
+                            {iconPath && (
+                              <Image src={iconPath} alt={TICKET_PRODUCT_LABELS[p]} width={16} height={16} />
+                            )}
+                            {TICKET_PRODUCT_LABELS[p]}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -377,7 +424,6 @@ export function TicketForm({
                     {...field}
                   />
                 </FormControl>
-
                 <FormMessage />
               </FormItem>
             )}
@@ -454,9 +500,7 @@ export function TicketForm({
 
         {/* Attachments */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">
-            Screenshots / Attachments
-          </label>
+          <label className="text-sm font-medium">Screenshots / Attachments</label>
           <AttachmentUploader
             ticketId={ticket?.id}
             value={attachments}
@@ -469,20 +513,11 @@ export function TicketForm({
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={loading}>
             {loading
-              ? mode === "create"
-                ? "Creating..."
-                : "Saving..."
-              : mode === "create"
-                ? "Create Ticket"
-                : "Save Changes"}
+              ? mode === "create" ? "Creating..." : "Saving..."
+              : mode === "create" ? "Create Ticket" : "Save Changes"}
           </Button>
           {onCancel && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onCancel}
-              disabled={loading}
-            >
+            <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
               Cancel
             </Button>
           )}

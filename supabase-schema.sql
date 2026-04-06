@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS tickets (
   steps_to_reproduce  TEXT,
   expected_behavior   TEXT,
   actual_behavior     TEXT,
+  product             TEXT DEFAULT 'other'
+                         CHECK (product IN ('vetra', 'gym_pocket', 'trackit', 'aqua', 'other')),
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
@@ -267,6 +269,14 @@ CREATE POLICY "Authenticated users can update tickets"
 --   ON tickets FOR DELETE TO authenticated
 --   USING (true);
 
+
+-- ============================================================
+-- MIGRATION: Run these if upgrading an existing DB
+-- ============================================================
+-- ALTER TABLE tickets ADD COLUMN IF NOT EXISTS product TEXT DEFAULT 'other'
+--   CHECK (product IN ('vetra', 'gym_pocket', 'trackit', 'aqua', 'other'));
+--
+-- ALTER TABLE ticket_comments ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
 
 -- ============================================================
 -- DONE! Next steps:
