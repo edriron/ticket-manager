@@ -113,3 +113,25 @@ export const TICKET_PRODUCT_ICON_PATHS: Partial<Record<TicketProduct, string>> =
   trackit: '/products/trackit.svg',
   aqua: '/products/aqua.svg',
 }
+
+// ─── Workflows ────────────────────────────────────────────────────────────────
+
+export type WorkflowStepType = 'status' | 'priority' | 'assignee' | 'comment'
+
+export interface WorkflowStep {
+  type: WorkflowStepType
+  // status → TicketStatus value, priority → TicketPriority, assignee → profile id or null, comment → text
+  value: string | null
+}
+
+export interface TicketWorkflow {
+  id: string
+  user_id: string
+  name: string
+  sort_order: number
+  steps: WorkflowStep[]
+  icon: string       // lucide icon name, e.g. 'Zap'
+  icon_color: string // hex color, e.g. '#6366f1'
+  created_at: string
+  updated_at: string
+}

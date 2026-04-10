@@ -65,6 +65,7 @@ import type {
   TicketStatus,
   TicketPriority,
   TicketProduct,
+  TicketWorkflow,
 } from "@/types";
 import {
   TICKET_STATUS_LABELS,
@@ -74,6 +75,7 @@ import {
   TICKET_PRODUCT_ICON_PATHS,
 } from "@/types";
 import { cn } from "@/lib/utils";
+import { WorkflowButton } from "@/components/tickets/workflow-button";
 
 interface TicketDetailClientProps {
   ticket: Ticket;
@@ -105,6 +107,8 @@ export function TicketDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [userResults, setUserResults] = useState<Profile[]>([]);
+  // Optimistic activity log entries (so new entries show without a page refresh)
+  const [pendingLogs, setPendingLogs] = useState<ActivityLog[]>([]);
 
   // Inline-editable text fields
   const [titleValue, setTitleValue] = useState(ticket.title);
@@ -166,18 +170,64 @@ export function TicketDetailClient({
       .eq("id", ticket.id);
     setSavingField(null);
     if (error) return false;
-    supabase
-      .from("activity_logs")
-      .insert({
+    await supabase.from("activity_logs").insert({
+      ticket_id: ticket.id,
+      user_id: currentUser.id,
+      action: "updated",
+      field,
+      old_value: oldDisplayValue ?? null,
+      new_value: displayValue ?? value,
+    });
+    // Optimistically surface the new entry without waiting for router.refresh()
+    setPendingLogs((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
         ticket_id: ticket.id,
         user_id: currentUser.id,
         action: "updated",
         field,
         old_value: oldDisplayValue ?? null,
         new_value: displayValue ?? value,
-      })
-      .then();
+        created_at: new Date().toISOString(),
+        user: currentUser,
+      },
+    ]);
     return true;
+  }
+
+  // ── Apply workflow ──────────────────────────────────────────────────────────
+
+  async function applyWorkflow(workflow: TicketWorkflow) {
+    const loadingId = toast.loading(`Applying "${workflow.name}"…`);
+    // React state updates (setStatus etc.) don't update the closure variable
+    // until the next render, so track latest values locally and pass them
+    // explicitly to handlers that embed them in notifications/emails.
+    let latestStatus = status;
+    let latestPriority = priority;
+    for (const step of workflow.steps) {
+      if (step.type === "status" && step.value) {
+        await handleStatusChange(step.value as TicketStatus);
+        latestStatus = step.value as TicketStatus;
+      } else if (step.type === "priority" && step.value) {
+        await handlePriorityChange(step.value as TicketPriority);
+        latestPriority = step.value as TicketPriority;
+      } else if (step.type === "assignee") {
+        const newProfile = step.value
+          ? (profiles.find((p) => p.id === step.value) ?? null)
+          : null;
+        await handleAssigneeChange(step.value, newProfile, latestStatus, latestPriority);
+      } else if (step.type === "comment" && step.value?.trim()) {
+        await supabase.from("ticket_comments").insert({
+          ticket_id: ticket.id,
+          user_id: currentUser.id,
+          content: step.value.trim(),
+        });
+      }
+    }
+    toast.dismiss(loadingId);
+    toast.success(`"${workflow.name}" applied`);
+    router.refresh();
   }
 
   async function saveTextField(
@@ -290,12 +340,20 @@ export function TicketDetailClient({
     }
   }
 
-  async function handleAssigneeChange(newAssigneeId: string | null) {
+  async function handleAssigneeChange(
+    newAssigneeId: string | null,
+    preloadedProfile?: Profile | null,
+    statusOverride?: TicketStatus,
+    priorityOverride?: TicketPriority,
+  ) {
     const prevId = assigneeId;
     const prevProfile = assigneeProfile;
-    const optimisticProfile = newAssigneeId
-      ? (userResults.find((u) => u.id === newAssigneeId) ?? null)
-      : null;
+    const optimisticProfile =
+      preloadedProfile !== undefined
+        ? preloadedProfile
+        : newAssigneeId
+          ? (userResults.find((u) => u.id === newAssigneeId) ?? null)
+          : null;
     setAssigneeId(newAssigneeId);
     setAssigneeProfile(optimisticProfile);
 
@@ -303,8 +361,8 @@ export function TicketDetailClient({
     if (ok) {
       toast.success(newAssigneeId ? "Assignee updated" : "Assignee removed");
       notifyDiscordUpdate(
-        status,
-        priority,
+        statusOverride ?? status,
+        priorityOverride ?? priority,
         optimisticProfile?.display_name ?? null,
       );
       if (newAssigneeId && newAssigneeId !== currentUser.id) {
@@ -330,8 +388,8 @@ export function TicketDetailClient({
               ticketId: ticket.id,
               ticketTitle: titleValue,
               ticketType: ticket.type,
-              priority,
-              status,
+              priority: priorityOverride ?? priority,
+              status: statusOverride ?? status,
               description: descriptionValue,
             }),
           }).catch(() => {});
@@ -461,7 +519,12 @@ export function TicketDetailClient({
               )}
             </p>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0 flex-wrap">
+            <WorkflowButton
+              userId={currentUser.id}
+              onApply={applyWorkflow}
+              disabled={!!savingField}
+            />
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -641,7 +704,7 @@ export function TicketDetailClient({
                   ticketNumber={ticket.ticket_number}
                   ticketTitle={titleValue}
                   comments={comments}
-                  activityLogs={activityLogs}
+                  activityLogs={[...activityLogs, ...pendingLogs]}
                   currentUser={currentUser}
                   profiles={profiles}
                   discordThreadId={ticket.discord_thread_id}

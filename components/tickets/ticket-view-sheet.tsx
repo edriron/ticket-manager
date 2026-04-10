@@ -81,6 +81,7 @@ import type {
   TicketStatus,
   TicketPriority,
   TicketProduct,
+  TicketWorkflow,
 } from "@/types";
 import {
   TICKET_STATUS_LABELS,
@@ -89,6 +90,7 @@ import {
   TICKET_PRODUCT_LABELS,
   TICKET_PRODUCT_ICON_PATHS,
 } from "@/types";
+import { WorkflowButton } from "./workflow-button";
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -210,19 +212,76 @@ export function TicketViewSheet({
       .eq("id", ticket.id);
     setSavingField(null);
     if (error) return false;
-    supabase
-      .from("activity_logs")
-      .insert({
+    await supabase.from("activity_logs").insert({
+      ticket_id: ticket.id,
+      user_id: currentUserId,
+      action: "updated",
+      field,
+      old_value: oldDisplayValue ?? null,
+      new_value: displayValue ?? value,
+    });
+    // Optimistically push the new log so the activity tab updates instantly
+    setActivityLogs((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
         ticket_id: ticket.id,
         user_id: currentUserId,
         action: "updated",
         field,
         old_value: oldDisplayValue ?? null,
         new_value: displayValue ?? value,
-      })
-      .then();
+        created_at: new Date().toISOString(),
+        user: currentUserProfile ?? undefined,
+      },
+    ]);
     router.refresh();
     return true;
+  }
+
+  // ── Apply workflow ──────────────────────────────────────────────────────────
+
+  async function applyWorkflow(workflow: TicketWorkflow) {
+    if (!ticket) return;
+    const loadingId = toast.loading(`Applying "${workflow.name}"…`);
+    // Track latest values locally — React state updates (setStatus etc.) are
+    // async and won't be reflected in the closure until the next render, so
+    // we pass these explicitly to handlers that need them (e.g. the email payload).
+    let latestStatus = status;
+    let latestPriority = priority;
+    let hasCommentStep = false;
+    for (const step of workflow.steps) {
+      if (step.type === "status" && step.value) {
+        await handleStatusChange(step.value as TicketStatus);
+        latestStatus = step.value as TicketStatus;
+      } else if (step.type === "priority" && step.value) {
+        await handlePriorityChange(step.value as TicketPriority);
+        latestPriority = step.value as TicketPriority;
+      } else if (step.type === "assignee") {
+        const newProfile = step.value
+          ? (profiles.find((p) => p.id === step.value) ?? null)
+          : null;
+        await handleAssigneeChange(step.value, newProfile, latestStatus, latestPriority);
+      } else if (step.type === "comment" && step.value?.trim()) {
+        hasCommentStep = true;
+        await supabase.from("ticket_comments").insert({
+          ticket_id: ticket.id,
+          user_id: currentUserId,
+          content: step.value.trim(),
+        });
+      }
+    }
+    // Refresh comments if a comment step was applied
+    if (hasCommentStep) {
+      const { data: c } = await supabase
+        .from("ticket_comments")
+        .select("*, user:profiles!ticket_comments_user_id_fkey(*)")
+        .eq("ticket_id", ticket.id)
+        .order("created_at", { ascending: true });
+      setComments((c as TicketComment[]) ?? []);
+    }
+    toast.dismiss(loadingId);
+    toast.success(`"${workflow.name}" applied`);
   }
 
   async function saveTextField(
@@ -336,6 +395,8 @@ export function TicketViewSheet({
   async function handleAssigneeChange(
     newId: string | null,
     newProfile: Profile | null,
+    statusOverride?: TicketStatus,
+    priorityOverride?: TicketPriority,
   ) {
     const prevId = assigneeId;
     const prevProfile = assigneeProfile;
@@ -368,8 +429,8 @@ export function TicketViewSheet({
               ticketId: ticket!.id,
               ticketTitle: titleValue,
               ticketType: ticket!.type,
-              priority,
-              status,
+              priority: priorityOverride ?? priority,
+              status: statusOverride ?? status,
               description: descriptionValue,
             }),
           }).catch(() => {});
@@ -780,6 +841,13 @@ export function TicketViewSheet({
 
                   {/* ── Sidebar ──────────────────────────────────────────────── */}
                   <div className="p-5 space-y-4">
+                    {/* Workflows */}
+                    <WorkflowButton
+                      userId={currentUserId}
+                      onApply={applyWorkflow}
+                      disabled={!!savingField}
+                    />
+
                     {/* Status */}
                     <div>
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">

@@ -19,12 +19,20 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { UserAvatar } from '@/components/layout/user-avatar'
-import { Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Sun, Moon, Monitor, Check, User, Palette, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import type { Profile } from '@/types'
+import { WorkflowManager } from '@/components/settings/workflow-manager'
+
+type Section = 'profile' | 'appearance' | 'workflows'
+
+const NAV_ITEMS: { id: Section; label: string; icon: React.ElementType }[] = [
+  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'workflows', label: 'Workflows', icon: Zap },
+]
 
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -37,6 +45,7 @@ interface SettingsClientProps {
 }
 
 export function SettingsClient({ profile }: SettingsClientProps) {
+  const [section, setSection] = useState<Section>('profile')
   const [saving, setSaving] = useState(false)
   const { theme, setTheme } = useTheme()
   const router = useRouter()
@@ -56,7 +65,6 @@ export function SettingsClient({ profile }: SettingsClientProps) {
   async function onSubmit(values: ProfileFormValues) {
     setSaving(true)
 
-    // Check name uniqueness (exclude own id)
     if (values.display_name !== profile.display_name) {
       const { data: existing } = await supabase
         .from('profiles')
@@ -66,9 +74,7 @@ export function SettingsClient({ profile }: SettingsClientProps) {
         .maybeSingle()
 
       if (existing) {
-        form.setError('display_name', {
-          message: 'This display name is already taken.',
-        })
+        form.setError('display_name', { message: 'This display name is already taken.' })
         setSaving(false)
         return
       }
@@ -92,154 +98,166 @@ export function SettingsClient({ profile }: SettingsClientProps) {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground text-sm">Manage your profile and preferences</p>
       </div>
 
-      <Tabs defaultValue="profile">
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="profile" className="flex-1 sm:flex-none">Profile</TabsTrigger>
-          <TabsTrigger value="appearance" className="flex-1 sm:flex-none">Appearance</TabsTrigger>
-        </TabsList>
+      <div className="flex flex-col sm:flex-row gap-8">
+        {/* ── Sidebar nav ─────────────────────────────────────────────────── */}
+        <nav className="shrink-0 sm:w-44">
+          <div className="flex sm:flex-col gap-1">
+            {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setSection(id)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full text-left transition-colors',
+                  section === id
+                    ? 'bg-secondary font-medium text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </nav>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Profile Information</CardTitle>
-              <CardDescription>
-                Update your display name and avatar URL.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Avatar preview */}
-              <div className="flex items-center gap-4 mb-6 p-4 rounded-lg bg-muted/50">
-                <UserAvatar
-                  displayName={watchedName || profile.display_name}
-                  avatarUrl={watchedAvatar || profile.avatar_url}
-                  size="lg"
-                />
-                <div>
-                  <p className="font-medium text-sm">{watchedName || profile.display_name}</p>
-                  <p className="text-xs text-muted-foreground">{profile.email}</p>
+        {/* ── Section content ──────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0">
+
+          {/* Profile */}
+          {section === 'profile' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Profile Information</CardTitle>
+                <CardDescription>Update your display name and avatar URL.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4 mb-6 p-4 rounded-lg bg-muted/50">
+                  <UserAvatar
+                    displayName={watchedName || profile.display_name}
+                    avatarUrl={watchedAvatar || profile.avatar_url}
+                    size="lg"
+                  />
+                  <div>
+                    <p className="font-medium text-sm">{watchedName || profile.display_name}</p>
+                    <p className="text-xs text-muted-foreground">{profile.email}</p>
+                  </div>
                 </div>
-              </div>
 
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="display_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Display Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your display name" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          This is how others will see you in the app.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="display_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Display Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your display name" {...field} />
+                          </FormControl>
+                          <FormDescription>This is how others will see you in the app.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={form.control}
-                    name="avatar_url"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Avatar URL</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="url"
-                            placeholder="https://example.com/avatar.jpg"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Link to your profile picture. Leave empty to use initials.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <FormField
+                      control={form.control}
+                      name="avatar_url"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Avatar URL</FormLabel>
+                          <FormControl>
+                            <Input type="url" placeholder="https://example.com/avatar.jpg" {...field} />
+                          </FormControl>
+                          <FormDescription>Link to your profile picture. Leave empty to use initials.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input value={profile.email ?? ''} disabled />
-                    </FormControl>
-                    <FormDescription>
-                      Email is managed by Google and cannot be changed here.
-                    </FormDescription>
-                  </FormItem>
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input value={profile.email ?? ''} disabled />
+                      </FormControl>
+                      <FormDescription>Email is managed by Google and cannot be changed here.</FormDescription>
+                    </FormItem>
 
-                  <Button type="submit" disabled={saving}>
-                    {saving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                    <Button type="submit" disabled={saving}>
+                      {saving ? 'Saving…' : 'Save Changes'}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Appearance Tab */}
-        <TabsContent value="appearance" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Appearance</CardTitle>
-              <CardDescription>
-                Choose how TrackIt looks for you.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Theme</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {THEME_OPTIONS.map((option) => {
-                    const Icon = option.icon
-                    const isSelected = theme === option.value
-
-                    return (
-                      <button
-                        key={option.value}
-                        onClick={() => setTheme(option.value)}
-                        className={cn(
-                          'relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:bg-muted/50',
-                          isSelected
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border'
-                        )}
-                      >
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            <Check className="h-3 w-3" />
-                          </div>
-                        )}
-                        <div
+          {/* Appearance */}
+          {section === 'appearance' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Appearance</CardTitle>
+                <CardDescription>Choose how TrackIt looks for you.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Theme</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {THEME_OPTIONS.map((option) => {
+                      const Icon = option.icon
+                      const isSelected = theme === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          onClick={() => setTheme(option.value)}
                           className={cn(
-                            'flex h-10 w-10 items-center justify-center rounded-full',
-                            isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                            'relative flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:bg-muted/50',
+                            isSelected ? 'border-primary bg-primary/5' : 'border-border',
                           )}
                         >
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <span className="text-sm font-medium">{option.label}</span>
-                      </button>
-                    )
-                  })}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                              <Check className="h-3 w-3" />
+                            </div>
+                          )}
+                          <div className={cn('flex h-10 w-10 items-center justify-center rounded-full', isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted')}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <span className="text-sm font-medium">{option.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    &quot;System&quot; automatically switches between light and dark based on your OS preference.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  &quot;System&quot; automatically switches between light and dark based on your OS preference.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Workflows */}
+          {section === 'workflows' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Workflows</CardTitle>
+                <CardDescription>
+                  Define reusable sequences of actions to apply to tickets in one click.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WorkflowManager userId={profile.id} />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

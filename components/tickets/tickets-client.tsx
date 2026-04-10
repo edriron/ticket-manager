@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -176,8 +176,11 @@ export function TicketsClient({
   const [doneFilter, setDoneFilter] = useState<"active" | "all">("active");
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
 
-  // Prevent saving defaults on first render before loading
-  const filterSaveReady = useRef(false);
+  // Guard: only save after the initial load from localStorage has been applied.
+  // Using state (not ref) so that setFiltersLoaded(true) is batched with the
+  // other setStates in the load effect — ensuring the save effect never fires
+  // with defaults before the restored values are in state.
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
 
   // Load filters from localStorage once on mount
   useEffect(() => {
@@ -188,12 +191,12 @@ export function TicketsClient({
     if (saved.priorityFilter) setPriorityFilter(saved.priorityFilter);
     if (saved.assigneeFilter) setAssigneeFilter(saved.assigneeFilter);
     if (saved.doneFilter) setDoneFilter(saved.doneFilter);
-    filterSaveReady.current = true;
+    setFiltersLoaded(true); // batched with the above — save won't fire until this render
   }, []);
 
-  // Save filters to localStorage whenever they change
+  // Save filters to localStorage whenever they change (but not before load)
   useEffect(() => {
-    if (!filterSaveReady.current) return;
+    if (!filtersLoaded) return;
     localStorage.setItem(
       LS_KEY,
       JSON.stringify({
@@ -206,6 +209,7 @@ export function TicketsClient({
       }),
     );
   }, [
+    filtersLoaded,
     search,
     typeFilter,
     statusFilter,
