@@ -200,6 +200,7 @@ export function TicketViewSheet({
     field: string,
     value: string | null,
     displayValue?: string,
+    oldDisplayValue?: string,
   ) {
     if (!ticket) return false;
     setSavingField(field);
@@ -216,6 +217,7 @@ export function TicketViewSheet({
         user_id: currentUserId,
         action: "updated",
         field,
+        old_value: oldDisplayValue ?? null,
         new_value: displayValue ?? value,
       })
       .then();
@@ -280,6 +282,7 @@ export function TicketViewSheet({
       "status",
       newStatus,
       TICKET_STATUS_LABELS[newStatus],
+      TICKET_STATUS_LABELS[prev],
     );
     if (ok) {
       toast.success(`Status → ${TICKET_STATUS_LABELS[newStatus]}`);
@@ -300,6 +303,7 @@ export function TicketViewSheet({
       "priority",
       newPriority,
       TICKET_PRIORITY_LABELS[newPriority],
+      TICKET_PRIORITY_LABELS[prev],
     );
     if (ok) {
       toast.success(`Priority → ${TICKET_PRIORITY_LABELS[newPriority]}`);

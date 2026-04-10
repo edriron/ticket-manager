@@ -157,6 +157,7 @@ export function TicketDetailClient({
     field: string,
     value: string | null,
     displayValue?: string,
+    oldDisplayValue?: string,
   ) {
     setSavingField(field);
     const { error } = await supabase
@@ -172,6 +173,7 @@ export function TicketDetailClient({
         user_id: currentUser.id,
         action: "updated",
         field,
+        old_value: oldDisplayValue ?? null,
         new_value: displayValue ?? value,
       })
       .then();
@@ -232,6 +234,7 @@ export function TicketDetailClient({
       "status",
       newStatus,
       TICKET_STATUS_LABELS[newStatus],
+      TICKET_STATUS_LABELS[prev],
     );
     if (ok) {
       toast.success(`Status → ${TICKET_STATUS_LABELS[newStatus]}`);
@@ -254,6 +257,7 @@ export function TicketDetailClient({
       "priority",
       newPriority,
       TICKET_PRIORITY_LABELS[newPriority],
+      TICKET_PRIORITY_LABELS[prev],
     );
     if (ok) {
       toast.success(`Priority → ${TICKET_PRIORITY_LABELS[newPriority]}`);

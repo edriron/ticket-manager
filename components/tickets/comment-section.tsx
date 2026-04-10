@@ -39,7 +39,7 @@ function ActivityItem({ log }: { log: ActivityLog }) {
   const actionText = () => {
     if (log.action === 'created') return 'created this ticket'
     if (log.action === 'updated') {
-      if (log.field === 'status') return `changed status from "${log.old_value}" to "${log.new_value}"`
+      if (log.field === 'status') return `changed status from "${log.old_value ?? 'None'}" to "${log.new_value}"`
       if (log.field === 'assignee') return 'updated the assignee'
       if (log.field === 'priority') return `changed priority to "${log.new_value}"`
       return 'updated this ticket'
