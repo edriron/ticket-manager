@@ -623,7 +623,7 @@ export function WorkflowManager({ userId }: WorkflowManagerProps) {
       supabase.from('ticket_workflows').select().eq('user_id', userId).order('sort_order'),
       supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, email, created_at, updated_at')
+        .select('id, display_name, avatar_url, email, email_on_assigned, email_on_new_ticket, email_on_mention, created_at, updated_at')
         .not('display_name', 'is', null)
         .order('display_name'),
     ]).then(([{ data: w }, { data: p }]) => {

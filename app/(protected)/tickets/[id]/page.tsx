@@ -55,7 +55,7 @@ export default async function TicketDetailPage({ params }: Props) {
 
   const [{ data: currentProfile }, { data: profiles }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
-    supabase.from('profiles').select('id, display_name, email, avatar_url, created_at, updated_at').order('display_name'),
+    supabase.from('profiles').select('id, display_name, email, avatar_url, email_on_assigned, email_on_new_ticket, email_on_mention, created_at, updated_at').order('display_name'),
   ])
 
   return (

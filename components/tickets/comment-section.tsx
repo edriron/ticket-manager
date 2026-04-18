@@ -5,18 +5,14 @@ import { toast } from 'sonner'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { ImageLightbox, useLightbox } from '@/components/ui/image-lightbox'
-import { commentSchema, type CommentFormValues } from '@/lib/validations'
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/layout/user-avatar'
 import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
 import { Trash2, Pencil, ImageIcon, X as XIcon, Loader2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { MentionTextarea, renderCommentContent } from './mention-textarea'
+import { CommentEditor, CommentContent } from './comment-editor'
 import type { TicketComment, ActivityLog, Profile } from '@/types'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form'
 
 interface CommentSectionProps {
   ticketId: string
@@ -108,12 +104,10 @@ function CommentItem({ comment, currentUserId, profiles, onDelete, onEdit }: Com
 
         {editing ? (
           <div className="space-y-2">
-            <MentionTextarea
+            <CommentEditor
               value={editContent}
               onChange={setEditContent}
-              rows={3}
               profiles={profiles}
-              autoFocus
             />
             <div className="flex gap-2">
               <Button size="sm" onClick={handleSave} disabled={saving}>
@@ -125,7 +119,7 @@ function CommentItem({ comment, currentUserId, profiles, onDelete, onEdit }: Com
             </div>
           </div>
         ) : (
-          <p className="text-sm whitespace-pre-wrap">{renderCommentContent(comment.content)}</p>
+          <CommentContent content={comment.content} />
         )}
 
         {/* Attached images */}
@@ -254,23 +248,13 @@ export function CommentSection({
   const [submitting, setSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments')
   const [commentImages, setCommentImages] = useState<CommentAttachment[]>([])
-  const [pasteUploading, setPasteUploading] = useState(false)
+  const [commentContent, setCommentContent] = useState('')
+  const [mentionedIds, setMentionedIds] = useState<string[]>([])
+  const [editorKey, setEditorKey] = useState(0)
   const supabase = createClient()
 
-  async function handlePasteImage(file: File) {
-    if (commentImages.length >= 5) return
-    setPasteUploading(true)
-    const result = await uploadCommentImage(file, supabase)
-    if (result) setCommentImages((prev) => [...prev, result])
-    setPasteUploading(false)
-  }
-
-  const form = useForm<CommentFormValues>({
-    resolver: zodResolver(commentSchema),
-    defaultValues: { content: '' },
-  })
-
-  async function onSubmit(values: CommentFormValues) {
+  async function handleSubmit() {
+    if (!commentContent.trim()) return
     setSubmitting(true)
 
     const { data, error } = await supabase
@@ -278,7 +262,7 @@ export function CommentSection({
       .insert({
         ticket_id: ticketId,
         user_id: currentUser.id,
-        content: values.content,
+        content: commentContent,
         attachments: commentImages,
       })
       .select('*, user:profiles!ticket_comments_user_id_fkey(*)')
@@ -291,29 +275,49 @@ export function CommentSection({
     }
 
     setComments((prev) => [...prev, data as TicketComment])
-    form.reset()
+    setCommentContent('')
     setCommentImages([])
+    setMentionedIds([])
+    setEditorKey((k) => k + 1)
     setSubmitting(false)
 
-    // Notify mentioned users
-    const mentionPattern = /@\[([^\]]+)\]/g
-    const mentionedNames = new Set([...values.content.matchAll(mentionPattern)].map((m) => m[1]))
-    if (mentionedNames.size > 0) {
-      const targets = profiles.filter(
-        (p) => p.display_name && mentionedNames.has(p.display_name) && p.id !== currentUser.id,
-      )
-      for (const target of targets) {
-        supabase.from('notifications').insert({
-          user_id: target.id,
-          title: `${currentUser.display_name ?? 'Someone'} mentioned you in #${ticketNumber}`,
-          body: ticketTitle,
-          ticket_id: ticketId,
-        }).then()
+    // Notify + email mentioned users
+    const targets = profiles.filter(
+      (p) => mentionedIds.includes(p.id) && p.id !== currentUser.id,
+    )
+    for (const target of targets) {
+      supabase.from('notifications').insert({
+        user_id: target.id,
+        title: `${currentUser.display_name ?? 'Someone'} mentioned you in #${ticketNumber}`,
+        body: ticketTitle,
+        ticket_id: ticketId,
+      }).then()
+
+      if (target.email) {
+        const plainText = commentContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+        fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trigger: 'comment_mention',
+            to: target.email,
+            recipientName: target.display_name ?? '',
+            senderName: currentUser.display_name ?? 'Someone',
+            ticketNumber,
+            ticketId,
+            ticketTitle,
+            ticketType,
+            priority: 'medium',
+            status: 'todo',
+            commentPreview: plainText.slice(0, 120),
+          }),
+        }).catch(() => {})
       }
     }
 
     // Mirror to Discord
     if (discordThreadId) {
+      const plainText = commentContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       fetch('/api/notify-discord', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -321,7 +325,7 @@ export function CommentSection({
           action: 'comment',
           ticketType,
           threadId: discordThreadId,
-          content: values.content,
+          content: plainText,
           authorName: currentUser.display_name ?? 'Someone',
         }),
       }).catch(() => {})
@@ -394,39 +398,23 @@ export function CommentSection({
               size="sm"
               className="mt-1 shrink-0"
             />
-            <div className="flex-1">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
-                  <FormField
-                    control={form.control}
-                    name="content"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <MentionTextarea
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Leave a comment… type @ to mention someone"
-                            rows={3}
-                            profiles={profiles}
-                            disabled={submitting || pasteUploading}
-                            onPasteImage={handlePasteImage}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <CommentImageUploader
-                    images={commentImages}
-                    onChange={setCommentImages}
-                    disabled={submitting || pasteUploading}
-                  />
-                  <Button type="submit" size="sm" disabled={submitting || pasteUploading}>
-                    {submitting ? 'Posting...' : pasteUploading ? 'Uploading image…' : 'Post comment'}
-                  </Button>
-                </form>
-              </Form>
+            <div className="flex-1 space-y-2">
+              <CommentEditor
+                key={editorKey}
+                value={commentContent}
+                onChange={setCommentContent}
+                onMentionIds={setMentionedIds}
+                profiles={profiles}
+                disabled={submitting}
+              />
+              <CommentImageUploader
+                images={commentImages}
+                onChange={setCommentImages}
+                disabled={submitting}
+              />
+              <Button size="sm" disabled={submitting} onClick={handleSubmit}>
+                {submitting ? 'Posting...' : 'Post comment'}
+              </Button>
             </div>
           </div>
         </>

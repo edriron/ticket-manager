@@ -85,7 +85,7 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground text-sm">Overview of all tickets</p>
         </div>
         <Button asChild size="sm" className="gap-1.5">
-          <Link href="/tickets">
+          <Link href="/tickets/new">
             <Plus className="h-4 w-4" />
             New Ticket
           </Link>

@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -141,6 +142,45 @@ export function TicketForm({
         user_id: currentUserId,
         action: "created",
       });
+
+      // Notify assignee (if set and not self)
+      if (values.assignee_id && values.assignee_id !== currentUserId) {
+        supabase
+          .from("notifications")
+          .insert({
+            user_id: values.assignee_id,
+            title: `You were assigned to new ticket #${(newTicket as { id: string; ticket_number: number }).ticket_number}`,
+            body: values.title,
+            ticket_id: newTicket.id,
+          })
+          .then();
+
+        const { data: assigneeProfile } = await supabase
+          .from("profiles")
+          .select("email, display_name")
+          .eq("id", values.assignee_id)
+          .maybeSingle();
+
+        if (assigneeProfile?.email) {
+          fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              trigger: "new_ticket",
+              to: assigneeProfile.email,
+              recipientName: assigneeProfile.display_name ?? "",
+              senderName: currentUserName ?? "Someone",
+              ticketNumber: (newTicket as { id: string; ticket_number: number }).ticket_number,
+              ticketId: newTicket.id,
+              ticketTitle: values.title,
+              ticketType: values.type,
+              priority: values.priority,
+              status: values.status,
+              description: values.description || null,
+            }),
+          }).catch(() => {});
+        }
+      }
 
       // Notify Discord
       try {
@@ -401,10 +441,10 @@ export function TicketForm({
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea
+                <RichTextEditor
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
                   placeholder="Provide more details about this ticket..."
-                  rows={4}
-                  {...field}
                 />
               </FormControl>
               <FormMessage />

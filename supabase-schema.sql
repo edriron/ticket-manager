@@ -4,16 +4,27 @@
 -- ============================================================
 
 -- ============================================================
+-- MIGRATION: Email preferences (run if upgrading existing DB)
+-- ============================================================
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_on_assigned   BOOLEAN NOT NULL DEFAULT TRUE;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_on_new_ticket  BOOLEAN NOT NULL DEFAULT TRUE;
+-- ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_on_mention     BOOLEAN NOT NULL DEFAULT TRUE;
+-- ============================================================
+
+-- ============================================================
 -- 1. PROFILES TABLE
 -- Extends auth.users — auto-created via trigger on sign-up
 -- ============================================================
 CREATE TABLE IF NOT EXISTS profiles (
-  id         UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  display_name TEXT UNIQUE,          -- null until user completes onboarding
-  avatar_url   TEXT,
-  email        TEXT,
-  created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW()
+  id               UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  display_name     TEXT UNIQUE,          -- null until user completes onboarding
+  avatar_url       TEXT,
+  email            TEXT,
+  email_on_assigned   BOOLEAN NOT NULL DEFAULT TRUE,
+  email_on_new_ticket BOOLEAN NOT NULL DEFAULT TRUE,
+  email_on_mention    BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;

@@ -24,7 +24,7 @@ export default async function TicketsPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('profiles')
-      .select('id, display_name, email, avatar_url, created_at, updated_at')
+      .select('id, display_name, email, avatar_url, email_on_assigned, email_on_new_ticket, email_on_mention, created_at, updated_at')
       .order('display_name', { ascending: true }),
     supabase
       .from('profiles')

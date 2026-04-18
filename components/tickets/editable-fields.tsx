@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { RichTextEditor, RichTextContent } from '@/components/ui/rich-text-editor'
 
 // ─── EditableMultiline ────────────────────────────────────────────────────────
 // Click to edit a textarea field. Auto-saves when focus leaves the component.
@@ -85,6 +86,76 @@ export function EditableMultiline({
         >
           {value ? (
             <p className="text-sm whitespace-pre-wrap text-muted-foreground leading-relaxed">{value}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground/40 italic">{placeholder}</p>
+          )}
+          <Pencil className="absolute top-1 right-1 h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-60 transition-opacity" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── EditableRichText ─────────────────────────────────────────────────────────
+// Click to edit a rich-text (TipTap) field. Explicit Save/Cancel buttons.
+
+interface EditableRichTextProps {
+  label: string
+  value: string | null
+  onSave: (val: string | null) => Promise<void>
+  placeholder?: string
+  labelClassName?: string
+}
+
+export function EditableRichText({
+  label,
+  value,
+  onSave,
+  placeholder = 'Click to add…',
+  labelClassName,
+}: EditableRichTextProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { if (!editing) setDraft(value ?? '') }, [value, editing])
+
+  async function save() {
+    setSaving(true)
+    await onSave(draft.trim() || null)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  function cancel() { setDraft(value ?? ''); setEditing(false) }
+
+  return (
+    <div>
+      <h3 className={cn('text-sm font-semibold mb-1.5', labelClassName)}>{label}</h3>
+      {editing ? (
+        <div className="space-y-1.5">
+          <RichTextEditor
+            value={draft}
+            onChange={setDraft}
+            placeholder={placeholder}
+            minHeight="100px"
+          />
+          <div className="flex gap-1.5">
+            <Button size="sm" className="h-6 px-2 text-xs" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+            <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={cancel} disabled={saving}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="group relative cursor-text rounded px-2 py-1 -mx-2 hover:bg-muted/50 transition-colors outline-none"
+          onClick={() => { setDraft(value ?? ''); setEditing(true) }}
+        >
+          {value ? (
+            <RichTextContent content={value} className="text-muted-foreground leading-relaxed" />
           ) : (
             <p className="text-sm text-muted-foreground/40 italic">{placeholder}</p>
           )}

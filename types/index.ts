@@ -19,6 +19,9 @@ export interface Profile {
   display_name: string | null;
   avatar_url: string | null;
   email: string | null;
+  email_on_assigned: boolean;
+  email_on_new_ticket: boolean;
+  email_on_mention: boolean;
   created_at: string;
   updated_at: string;
 }

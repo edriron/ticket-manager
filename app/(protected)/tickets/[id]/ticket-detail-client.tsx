@@ -13,6 +13,7 @@ import { UserAvatar } from "@/components/layout/user-avatar";
 import { CommentSection } from "@/components/tickets/comment-section";
 import {
   EditableMultiline,
+  EditableRichText,
   EditableSingleLine,
 } from "@/components/tickets/editable-fields";
 import { ImageLightbox, useLightbox } from "@/components/ui/image-lightbox";
@@ -568,11 +569,10 @@ export function TicketDetailClient({
             <Card>
               <CardContent className="pt-6 space-y-5">
                 {/* Description */}
-                <EditableMultiline
+                <EditableRichText
                   label="Description"
                   value={descriptionValue}
                   placeholder="Click to add a description…"
-                  rows={4}
                   onSave={(v) =>
                     saveTextField("description", v, setDescriptionValue)
                   }

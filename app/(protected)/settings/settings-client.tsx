@@ -20,17 +20,18 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { UserAvatar } from '@/components/layout/user-avatar'
-import { Sun, Moon, Monitor, Check, User, Palette, Zap } from 'lucide-react'
+import { Sun, Moon, Monitor, Check, User, Palette, Zap, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
 import type { Profile } from '@/types'
 import { WorkflowManager } from '@/components/settings/workflow-manager'
 
-type Section = 'profile' | 'appearance' | 'workflows'
+type Section = 'profile' | 'appearance' | 'workflows' | 'notifications'
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'workflows', label: 'Workflows', icon: Zap },
 ]
 
@@ -47,6 +48,12 @@ interface SettingsClientProps {
 export function SettingsClient({ profile }: SettingsClientProps) {
   const [section, setSection] = useState<Section>('profile')
   const [saving, setSaving] = useState(false)
+  const [savingNotifs, setSavingNotifs] = useState(false)
+  const [emailPrefs, setEmailPrefs] = useState({
+    email_on_assigned: profile.email_on_assigned ?? true,
+    email_on_new_ticket: profile.email_on_new_ticket ?? true,
+    email_on_mention: profile.email_on_mention ?? true,
+  })
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const supabase = createClient()
@@ -95,6 +102,20 @@ export function SettingsClient({ profile }: SettingsClientProps) {
       router.refresh()
     }
     setSaving(false)
+  }
+
+  async function saveEmailPrefs() {
+    setSavingNotifs(true)
+    const { error } = await supabase
+      .from('profiles')
+      .update(emailPrefs)
+      .eq('id', profile.id)
+    if (error) {
+      toast.error('Failed to save preferences', { description: error.message })
+    } else {
+      toast.success('Notification preferences saved!')
+    }
+    setSavingNotifs(false)
   }
 
   return (
@@ -238,6 +259,54 @@ export function SettingsClient({ profile }: SettingsClientProps) {
                     &quot;System&quot; automatically switches between light and dark based on your OS preference.
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Notifications */}
+          {section === 'notifications' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Email Notifications</CardTitle>
+                <CardDescription>Choose which events send you an email. In-app notifications are always on.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {[
+                  {
+                    key: 'email_on_new_ticket' as const,
+                    label: 'New ticket assigned to you',
+                    description: 'Receive an email when a ticket is created and assigned to you.',
+                  },
+                  {
+                    key: 'email_on_assigned' as const,
+                    label: 'Assigned to existing ticket',
+                    description: 'Receive an email when you are assigned to an already-existing ticket.',
+                  },
+                  {
+                    key: 'email_on_mention' as const,
+                    label: 'Mentioned in a comment',
+                    description: 'Receive an email when someone @mentions you in a comment.',
+                  },
+                ].map(({ key, label, description }) => (
+                  <label key={key} className="flex items-start gap-3 cursor-pointer group">
+                    <div className="mt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={emailPrefs[key]}
+                        onChange={(e) => setEmailPrefs((p) => ({ ...p, [key]: e.target.checked }))}
+                        className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium group-hover:text-foreground">{label}</p>
+                      <p className="text-xs text-muted-foreground">{description}</p>
+                    </div>
+                  </label>
+                ))}
+
+                <Button onClick={saveEmailPrefs} disabled={savingNotifs} className="mt-2">
+                  {savingNotifs ? 'Saving…' : 'Save Preferences'}
+                </Button>
               </CardContent>
             </Card>
           )}

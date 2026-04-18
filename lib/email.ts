@@ -2,7 +2,7 @@
 // Requires RESEND_API_KEY and EMAIL_FROM in environment variables.
 // If RESEND_API_KEY is not set, all sends are silently skipped.
 
-export type EmailTrigger = 'assigned' | 'status_changed' | 'comment_mention'
+export type EmailTrigger = 'assigned' | 'new_ticket' | 'status_changed' | 'comment_mention'
 
 export interface TicketEmailContext {
   trigger: EmailTrigger
@@ -17,7 +17,7 @@ export interface TicketEmailContext {
   status: string
   description?: string | null
   appUrl: string            // base URL, e.g. https://yourapp.com
-  // For assigned trigger
+  // For assigned / new_ticket trigger
   assigneeName?: string
   // For status_changed trigger
   newStatus?: string
@@ -77,6 +77,10 @@ function buildEmail(ctx: TicketEmailContext): { subject: string; html: string } 
     subject = `[TrackIt] You've been assigned to #${ctx.ticketNumber}`
     headerLine = `${ctx.senderName} assigned you to a ticket`
     subHeaderLine = 'You are now responsible for this ticket.'
+  } else if (ctx.trigger === 'new_ticket') {
+    subject = `[TrackIt] New ticket assigned to you: #${ctx.ticketNumber}`
+    headerLine = `A new ticket has been assigned to you`
+    subHeaderLine = `Created by ${ctx.senderName}`
   } else if (ctx.trigger === 'status_changed') {
     subject = `[TrackIt] Ticket #${ctx.ticketNumber} status updated`
     headerLine = `Status changed to ${ctx.newStatus ?? statusLabel}`
@@ -87,8 +91,10 @@ function buildEmail(ctx: TicketEmailContext): { subject: string; html: string } 
     subHeaderLine = ctx.commentPreview ? `"${ctx.commentPreview.slice(0, 120)}…"` : ''
   }
 
-  const descriptionRow = ctx.description
-    ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:13px;vertical-align:top;width:120px">Description</td><td style="padding:6px 0;font-size:13px;color:#111827">${escHtml(ctx.description.slice(0, 300))}${ctx.description.length > 300 ? '…' : ''}</td></tr>`
+  // Strip HTML tags for email preview (description may now be HTML)
+  const descPlain = ctx.description ? stripHtml(ctx.description) : null
+  const descriptionRow = descPlain
+    ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:13px;vertical-align:top;width:120px">Description</td><td style="padding:6px 0;font-size:13px;color:#111827">${escHtml(descPlain.slice(0, 300))}${descPlain.length > 300 ? '…' : ''}</td></tr>`
     : ''
 
   const html = `<!DOCTYPE html>
@@ -152,6 +158,10 @@ function buildEmail(ctx: TicketEmailContext): { subject: string; html: string } 
 </html>`
 
   return { subject, html }
+}
+
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function escHtml(s: string): string {

@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { EditableMultiline, EditableSingleLine } from "./editable-fields";
+import { EditableMultiline, EditableRichText, EditableSingleLine } from "./editable-fields";
 import {
   ImageLightbox,
   useLightbox,
@@ -677,11 +677,10 @@ export function TicketViewSheet({
                   {/* Main content */}
                   <div className="p-6 space-y-5 border-r">
                     {/* Description */}
-                    <EditableMultiline
+                    <EditableRichText
                       label="Description"
                       value={descriptionValue}
                       placeholder="Click to add a description…"
-                      rows={4}
                       onSave={(v) =>
                         saveTextField("description", v, setDescriptionValue)
                       }
