@@ -32,7 +32,14 @@ import { AttachmentUploader, type UploadedFile } from "./attachment-uploader";
 import type { Ticket, TicketAttachment } from "@/types";
 import { TICKET_PRODUCT_LABELS, TICKET_PRODUCT_ICON_PATHS } from "@/types";
 
-const PRODUCTS = ["vetra", "gym_pocket", "trackit", "aqua", "other"] as const;
+const PRODUCTS = [
+  "vetra",
+  "gym_pocket",
+  "trackit",
+  "aqua",
+  "lumos",
+  "other",
+] as const;
 
 interface TicketFormProps {
   mode: "create" | "edit";
@@ -144,7 +151,8 @@ export function TicketForm({
             action: "create",
             ticketType: values.type,
             ticketId: newTicket.id,
-            ticketNumber: (newTicket as { id: string; ticket_number: number }).ticket_number,
+            ticketNumber: (newTicket as { id: string; ticket_number: number })
+              .ticket_number,
             title: values.title,
             priority: values.priority,
             description: values.description || null,
@@ -152,7 +160,10 @@ export function TicketForm({
             expectedBehavior: values.expected_behavior || null,
             actualBehavior: values.actual_behavior || null,
             environmentUrl: values.environment_url || null,
-            attachments: attachments.map((a) => ({ filename: a.filename, url: a.url })),
+            attachments: attachments.map((a) => ({
+              filename: a.filename,
+              url: a.url,
+            })),
           }),
         });
         if (res.ok) {
@@ -160,7 +171,10 @@ export function TicketForm({
           if (threadId) {
             await supabase
               .from("tickets")
-              .update({ discord_thread_id: threadId, discord_message_id: messageId ?? null })
+              .update({
+                discord_thread_id: threadId,
+                discord_message_id: messageId ?? null,
+              })
               .eq("id", newTicket.id);
           }
         }
@@ -278,7 +292,9 @@ export function TicketForm({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="bug">🐛 Bug</SelectItem>
-                    <SelectItem value="feature_request">✨ Feature Request</SelectItem>
+                    <SelectItem value="feature_request">
+                      ✨ Feature Request
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -329,7 +345,12 @@ export function TicketForm({
                         <SelectItem key={p} value={p}>
                           <div className="flex items-center gap-2">
                             {iconPath && (
-                              <Image src={iconPath} alt={TICKET_PRODUCT_LABELS[p]} width={16} height={16} />
+                              <Image
+                                src={iconPath}
+                                alt={TICKET_PRODUCT_LABELS[p]}
+                                width={16}
+                                height={16}
+                              />
                             )}
                             {TICKET_PRODUCT_LABELS[p]}
                           </div>
@@ -500,7 +521,9 @@ export function TicketForm({
 
         {/* Attachments */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Screenshots / Attachments</label>
+          <label className="text-sm font-medium">
+            Screenshots / Attachments
+          </label>
           <AttachmentUploader
             ticketId={ticket?.id}
             value={attachments}
@@ -513,11 +536,20 @@ export function TicketForm({
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={loading}>
             {loading
-              ? mode === "create" ? "Creating..." : "Saving..."
-              : mode === "create" ? "Create Ticket" : "Save Changes"}
+              ? mode === "create"
+                ? "Creating..."
+                : "Saving..."
+              : mode === "create"
+                ? "Create Ticket"
+                : "Save Changes"}
           </Button>
           {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={loading}
+            >
               Cancel
             </Button>
           )}

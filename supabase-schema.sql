@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   expected_behavior   TEXT,
   actual_behavior     TEXT,
   product             TEXT DEFAULT 'other'
-                         CHECK (product IN ('vetra', 'gym_pocket', 'trackit', 'aqua', 'other')),
+                         CHECK (product IN ('vetra', 'gym_pocket', 'trackit', 'aqua', 'lumos', 'other')),
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
