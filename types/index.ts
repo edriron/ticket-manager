@@ -6,13 +6,9 @@ export type TicketStatus =
   | "in_testing"
   | "done";
 export type TicketPriority = "low" | "medium" | "high" | "critical";
-export type TicketProduct =
-  | "vetra"
-  | "gym_pocket"
-  | "trackit"
-  | "aqua"
-  | "lumos"
-  | "other";
+import type { TicketProduct } from "@/lib/products";
+export type { TicketProduct };
+export { TICKET_PRODUCT_LABELS, TICKET_PRODUCT_ICON_PATHS } from "@/lib/products";
 
 export interface Profile {
   id: string;
@@ -113,23 +109,6 @@ export const TICKET_STATUS_ORDER: TicketStatus[] = [
   "done",
 ];
 
-export const TICKET_PRODUCT_LABELS: Record<TicketProduct, string> = {
-  vetra: "Vetra",
-  gym_pocket: "Gym Pocket",
-  trackit: "TrackIt",
-  aqua: "Aqua",
-  lumos: "Lumos",
-  other: "Other",
-};
-
-export const TICKET_PRODUCT_ICON_PATHS: Partial<Record<TicketProduct, string>> =
-  {
-    vetra: "/products/vetra.svg",
-    gym_pocket: "/products/gym-pocket.svg",
-    trackit: "/products/trackit.svg",
-    aqua: "/products/aqua.svg",
-    lumos: "/products/lumos.svg",
-  };
 
 // ─── Workflows ────────────────────────────────────────────────────────────────
 

@@ -31,16 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { UserSearch } from "./user-search";
 import { AttachmentUploader, type UploadedFile } from "./attachment-uploader";
 import type { Ticket, TicketAttachment } from "@/types";
-import { TICKET_PRODUCT_LABELS, TICKET_PRODUCT_ICON_PATHS } from "@/types";
-
-const PRODUCTS = [
-  "vetra",
-  "gym_pocket",
-  "trackit",
-  "aqua",
-  "lumos",
-  "other",
-] as const;
+import { PRODUCTS } from "@/lib/products";
 
 interface TicketFormProps {
   mode: "create" | "edit";
@@ -379,24 +370,21 @@ export function TicketForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {PRODUCTS.map((p) => {
-                      const iconPath = TICKET_PRODUCT_ICON_PATHS[p];
-                      return (
-                        <SelectItem key={p} value={p}>
-                          <div className="flex items-center gap-2">
-                            {iconPath && (
-                              <Image
-                                src={iconPath}
-                                alt={TICKET_PRODUCT_LABELS[p]}
-                                width={16}
-                                height={16}
-                              />
-                            )}
-                            {TICKET_PRODUCT_LABELS[p]}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
+                    {PRODUCTS.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <div className="flex items-center gap-2">
+                          {p.iconPath && (
+                            <Image
+                              src={p.iconPath}
+                              alt={p.label}
+                              width={16}
+                              height={16}
+                            />
+                          )}
+                          {p.label}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PRODUCT_IDS } from "@/lib/products";
 
 export const displayNameSchema = z.object({
   display_name: z
@@ -22,14 +23,7 @@ export const ticketSchema = z.object({
     "done",
   ] as const),
   priority: z.enum(["low", "medium", "high", "critical"] as const),
-  product: z.enum([
-    "vetra",
-    "gym_pocket",
-    "trackit",
-    "aqua",
-    "lumos",
-    "other",
-  ] as const),
+  product: z.enum(PRODUCT_IDS),
   description: z
     .string()
     .max(10000, "Description is too long")

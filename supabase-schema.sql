@@ -58,8 +58,9 @@ CREATE TABLE IF NOT EXISTS tickets (
   steps_to_reproduce  TEXT,
   expected_behavior   TEXT,
   actual_behavior     TEXT,
+  -- Keep this list in sync with lib/products.ts (PRODUCTS array)
   product             TEXT DEFAULT 'other'
-                         CHECK (product IN ('vetra', 'gym_pocket', 'trackit', 'aqua', 'lumos', 'other')),
+                         CHECK (product IN ('vetra', 'gym_pocket', 'trackit', 'aqua', 'lumos', 'shyft', 'other')),
   created_at          TIMESTAMPTZ DEFAULT NOW(),
   updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
